@@ -33,3 +33,5 @@ require (
 replace ivxv.ee/common/collector => ../common/collector
 
 replace ivxv.ee/sessionstatus/api => ../sessionstatus/api
+
+replace tivi.io/core => ../core

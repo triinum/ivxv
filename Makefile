@@ -21,6 +21,7 @@ help:
 	@echo "       make install       Install all collector components to \$$DESTDIR"
 	@echo "       make install-java  Install all application components to \$$DESTDIR"
 	@echo "       make clean         Clean the repository"
+	@echo "       make docker        Build all microservice container images"
 	@echo
 	@echo "       make <component>          Build the component (listed below)"
 	@echo "       make test-<component>     Run unit tests for the component"
@@ -141,3 +142,11 @@ version:
 .PHONY: --gotools
 --gotools:
 	$(MAKE) -C common/collector gotools
+
+.PHONY: docker
+docker:
+	$(MAKE) -C docker all
+
+.PHONY: docker-online
+docker-online:
+	$(MAKE) -C docker online
