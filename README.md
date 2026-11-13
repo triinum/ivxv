@@ -55,7 +55,8 @@
 │   ├── base/                 ← Deployment + Service iga teenuse jaoks
 │   │   ├── proxy/
 │   │   ├── …                 ← sama nimekiri mis services/
-│   │   ├── etcd/
+│   │   ├── postgres/           ← PutGetter backend (dev)
+│   │   ├── etcd/               ← legacy (valikuline)
 │   │   └── config/           ← Secret’id (/etc/ivxv)
 │   └── overlays/
 │       ├── dev/              ← 1 replica, ilma avaliku sissepääsuta
@@ -86,8 +87,7 @@ See **ei ole** lihtsalt seadistuse vahetus. etcd on üks `PutGetter`
 protokolle; Postgresi jaoks tuleb kirjutada **uus protokoll** sama liidese peale.
 
 ```text
-teenused → storage.Client → PutGetter → etcd | file | memory
-                                         └── (+ postgres, kui implementeerid)
+teenused → storage.Client → PutGetter → postgres | etcd | file | memory
 ```
 
 Liides (`common/collector/storage` koodirepos): `Put`, `Get`, `GetWithPrefix`,
@@ -123,4 +123,41 @@ Liides (`common/collector/storage` koodirepos): `Put`, `Get`, `GetWithPrefix`,
 | Indeksid | prefix-päringud vajavad head `key` indeksit |
 | Ei ole SQL ORM | ärikiht jääb võti–väärtus; Postgres on backend |
 | Alternatiiv | DynamoDB sobib KV-le sageli loomulikumalt kui SQL |
-| Staatus | koodirepos `postgres` protokolli **veel ei ole** — ainult `etcd` / `file` / `memory` |
+| Staatus | `postgres` on koodirepos: `common/collector/storage/postgres` (AWS: RDS; dev: `k8s/base/postgres`) |
+
+## Kuidas etcd asendada DynamoDB-ga
+
+Samuti `PutGetter` protokoll (pole SQL). AWS-is sageli **loomulikum** KV-le kui Postgres.
+
+```text
+teenused → storage.Client → PutGetter → dynamodb
+```
+
+### Sammud
+
+1. **Uus pakk** `common/collector/storage/dynamodb/`
+   - `storage.Register("dynamodb", …)`
+   - tabel: partition key `key` (S), attributes `value` (B), `serial` (N)
+   - `Put` = `PutItem` + condition `attribute_not_exists(key)`
+   - `Get` = `GetItem`; `GetWithPrefix` = `Query`/`Scan` + begins_with (või GSI)
+   - `CAS` = `UpdateItem` condition `value = :old`
+2. **Technical config**
+   ```yaml
+   storage:
+     protocol: dynamodb
+     conf:
+       Table: ivxv-kv
+       Region: eu-north-1
+   ```
+3. **Infra** — DynamoDB tabel + IAM/IRSA EKS podidele; etcd/Postgres StatefulSet ei ole vaja
+4. **Staatus** — koodirepos `dynamodb` protokolli **veel ei ole** (postgres on olemas)
+
+### Postgres vs DynamoDB
+
+| | Postgres | DynamoDB |
+|--|----------|----------|
+| Mudel | SQL KV-tabel | Native KV |
+| Prefix | `LIKE` + indeks | `begins_with` / GSI disain |
+| Ops | RDS Multi-AZ | Serverless / on-demand |
+| IVXV | `protocol: postgres` valmis | vaja uut PutGetter pakki |
+
