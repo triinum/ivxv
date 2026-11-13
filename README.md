@@ -28,3 +28,9 @@ Build all service images::
 Or use Compose for local wiring (configuration under ``./config``)::
 
         docker compose build
+
+Kubernetes (Kustomize base + overlays)::
+
+        kubectl apply -k k8s/overlays/dev
+
+See ``k8s/README.md``.

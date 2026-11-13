@@ -1,0 +1,54 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: collector-admin
+  labels:
+    app.kubernetes.io/name: collector-admin
+    app.kubernetes.io/part-of: ivxv
+    app.kubernetes.io/component: collector
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: collector-admin
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: collector-admin
+        app.kubernetes.io/part-of: ivxv
+        app.kubernetes.io/component: collector
+    spec:
+      containers:
+        - name: collector-admin
+          image: ivxv/collector-admin
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: service
+              containerPort: 8080
+              protocol: TCP
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: "1"
+              memory: 512Mi
+          volumeMounts:
+            - name: ivxv-config
+              mountPath: /etc/ivxv
+              readOnly: true
+          readinessProbe:
+            tcpSocket:
+              port: service
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            tcpSocket:
+              port: service
+            initialDelaySeconds: 15
+            periodSeconds: 20
+      volumes:
+        - name: ivxv-config
+          secret:
+            secretName: ivxv-config
+            optional: true

@@ -74,3 +74,16 @@ Shared libraries (not services):
 1. Work in `services/<name>/` (and shared libs only when needed).
 2. Build with that directory’s `Dockerfile`.
 3. Mount election/technical/trust config at `/etc/ivxv` when running.
+
+## Kubernetes
+
+Kustomize manifests live under `k8s/`:
+
+- `k8s/base/<service>/` — Deployment + Service per microservice
+- `k8s/overlays/{dev,staging,prod}/` — environment overlays (replicas, resources, image tags, Ingress)
+
+```bash
+kubectl apply -k k8s/overlays/dev
+```
+
+See `k8s/README.md`.
