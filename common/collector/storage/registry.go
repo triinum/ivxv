@@ -13,9 +13,10 @@ type Protocol string
 
 // Enumeration of storage protocols.
 const (
-	Memory Protocol = "memory"
-	File   Protocol = "file"
-	Etcd   Protocol = "etcd"
+	Memory   Protocol = "memory"
+	File     Protocol = "file"
+	Etcd     Protocol = "etcd"
+	Postgres Protocol = "postgres"
 )
 
 // Here we "declare" error types, but instead of defining them ourselves, we

@@ -22,7 +22,7 @@ patches:
   - path: patches/patch-votesorder.yaml
   - path: patches/patch-xroad-service.yaml
   - path: patches/patch-collector-admin.yaml
-  - path: patches/patch-etcd.yaml
+  - path: patches/patch-postgres.yaml
 images:
   - name: ivxv/proxy
     newName: ivxv/proxy
