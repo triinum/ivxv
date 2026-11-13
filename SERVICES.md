@@ -83,10 +83,11 @@ Shared libraries (not services):
 Kustomize manifests live under `k8s/`:
 
 - `k8s/base/<service>/` — Deployment + Service per microservice
-- `k8s/overlays/{dev,staging,prod}/` — environment overlays (replicas, resources, image tags, Ingress)
+- `k8s/overlays/{dev,staging,prod,aws}/` — environment overlays (replicas, resources, image tags, Ingress/NLB)
 
 ```bash
 kubectl apply -k k8s/overlays/dev
+kubectl apply -k k8s/overlays/aws   # ECR + EKS; public traffic only to proxy
 ```
 
-See `k8s/README.md`.
+See `k8s/README.md` and `k8s/AWS.md`.

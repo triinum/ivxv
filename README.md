@@ -33,5 +33,7 @@ Or use Compose for local wiring (configuration under ``./config``)::
 Kubernetes (Kustomize base + overlays)::
 
         kubectl apply -k k8s/overlays/dev
+        kubectl apply -k k8s/overlays/aws
 
-See ``k8s/README.md``.
+AWS (ECR + EKS, public LB only in front of proxy): see ``k8s/AWS.md``.
+Also ``k8s/README.md``.

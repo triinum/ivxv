@@ -14,7 +14,10 @@ k8s/
     dev/                    # local / CI-like: 1 replica, light resources
     staging/                # more replicas + Ingress
     prod/                   # HA replicas + Ingress
+    aws/                    # ECR images + public NLB on proxy only
 ```
+
+AWS (ECR → EKS → NLB only in front of proxy): see **`AWS.md`**.
 
 ## Services covered
 
@@ -51,12 +54,14 @@ Full stack for an environment:
 kubectl apply -k k8s/overlays/dev
 kubectl apply -k k8s/overlays/staging
 kubectl apply -k k8s/overlays/prod
+kubectl apply -k k8s/overlays/aws      # Amazon EKS + public proxy NLB
 ```
 
 Preview:
 
 ```bash
 kubectl kustomize k8s/overlays/prod
+kubectl kustomize k8s/overlays/aws
 ```
 
 ## Configuration
@@ -70,11 +75,13 @@ technical containers before pods can serve traffic.
 
 ## Overlay differences
 
-| | dev | staging | prod |
-|---|-----|---------|------|
-| namespace | `ivxv-dev` | `ivxv-staging` | `ivxv-prod` |
-| replicas | 1 | 2 (most) | 3 (most) |
-| image tag | `dev` | `staging` | `prod` |
-| Ingress | no | proxy + admin | proxy + admin |
+| | dev | staging | prod | aws |
+|---|-----|---------|------|-----|
+| namespace | `ivxv-dev` | `ivxv-staging` | `ivxv-prod` | `ivxv-aws` |
+| replicas | 1 | 2 (most) | 3 (most) | 2–3 (most) |
+| image tag / registry | `dev` | `staging` | `prod` | ECR (`ACCOUNT.dkr.ecr…`) |
+| Public entry | no | Ingress proxy + admin | Ingress proxy + admin | **NLB → proxy only** |
 
 Edit hosts in `overlays/*/ingress.yaml` before using staging/prod Ingress.
+
+For AWS, prefer `overlays/aws`: public load balancer only on `proxy`; admin and other services stay private. Details in `AWS.md`.
