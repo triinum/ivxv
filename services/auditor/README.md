@@ -8,9 +8,10 @@
 | **Port (K8s)** | — |
 | **Tüüp** | Offline tööriist (mitte püsiv Deployment) |
 
-Java. Tõestuste / auditi kontroll.
+Java. Kontrollib shuffle/decrypt **tõestusi** ning processor’i terviklikkust /
+auditirada. Ei ole online API.
 
 ## Seosed
 
-- Kubernetes baas: `k8s/base/auditor/` (offline — tavaliselt pole Deployment’i)
-- Avalik ligipääs: **ei** (vaid `proxy` on avalik)
+- Kasutatakse koos `processor` ja `key` tulemustega
+- Avalik ligipääs: **ei**

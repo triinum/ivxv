@@ -8,9 +8,10 @@
 | **Port (K8s)** | — |
 | **Tüüp** | Offline tööriist (mitte püsiv Deployment) |
 
-Java. Võtmete genereerimine ja dekrüpteerimine. Job / kohalik jooks.
+Java. Võtmeparameetrid / genereerimine (sh nutikaardi jagud), testvõti, anonüümse
+häältekasti **dekrüpteerimine** koos tõestustega. Job / kohalik jooks.
 
 ## Seosed
 
-- Kubernetes baas: `k8s/base/key/` (offline — tavaliselt pole Deployment’i)
-- Avalik ligipääs: **ei** (vaid `proxy` on avalik)
+- Sisend tihti `processor` väljundist; kontrollib `auditor`
+- Avalik ligipääs: **ei**

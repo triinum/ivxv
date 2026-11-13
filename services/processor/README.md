@@ -1,4 +1,4 @@
-# `processor` — Offline: töötlus
+# `processor` — Offline: häältekasti töötlus
 
 | | |
 |--|--|
@@ -8,9 +8,10 @@
 | **Port (K8s)** | — |
 | **Tüüp** | Offline tööriist (mitte püsiv Deployment) |
 
-Java. Häältekasti valideerimine / anonüümimine pärast hääletust.
+Java. Offline toru pärast hääletust: **check → squash → revoke → anonymize**.
+Käivitatakse Job’ina / operaatori masinal, mitte pideva EKS teenusena.
 
 ## Seosed
 
-- Kubernetes baas: `k8s/base/processor/` (offline — tavaliselt pole Deployment’i)
-- Avalik ligipääs: **ei** (vaid `proxy` on avalik)
+- Järgneb sageli `key` (dekrüpteerimine) ja `auditor` (tõestuste kontroll)
+- Avalik ligipääs: **ei**
