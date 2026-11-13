@@ -4,6 +4,9 @@ All deployable units live under `services/<name>/`. Each service directory
 contains its own source and a co-located `Dockerfile` so the service can be
 developed and released independently.
 
+Dockerfile layout, build patterns, and the service↔image catalog are documented
+in **`services/README.md`**.
+
 ```text
 services/
   proxy/              # Dockerfile + Go module

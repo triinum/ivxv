@@ -15,7 +15,8 @@ Microservices
 -------------
 
 Deployable units live under ``services/<name>/``. Each service directory
-contains its own source **and** ``Dockerfile``. See ``SERVICES.md``.
+contains its own source **and** ``Dockerfile``. See ``SERVICES.md`` and
+``services/README.md`` (Dockerfile structure).
 
 Build a single service image (from the repository root)::
 

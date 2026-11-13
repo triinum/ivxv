@@ -1,10 +1,27 @@
 # Docker build helpers
 
-Shared helpers for building service images. **Per-service Dockerfiles live next
-to each service** under `services/<name>/Dockerfile` — not here.
+Shared helpers for building service images.
 
-- `go-build.sh` — codegen + compile for Go collector services
-- `gen-go-dockerfiles.sh` — regenerates Go Dockerfiles under `services/`
-- `Makefile` — `make -C docker all` / `online` / `offline`
+**Per-service Dockerfiles are not here.** They live next to each service:
 
-See `/SERVICES.md` for the service map.
+`services/<name>/Dockerfile`
+
+See **`services/README.md`** for the full Dockerfile structure, catalog, and
+build patterns.
+
+## Contents of this directory
+
+| File | Purpose |
+|------|---------|
+| `go-build.sh` | Codegen + compile for Go collector services (used inside Dockerfiles) |
+| `gen-go-dockerfiles.sh` | Regenerates Go collector Dockerfiles under `services/` |
+| `Makefile` | `make -C docker all` / `online` / `offline` |
+
+## Quick build
+
+From repository root:
+
+```bash
+docker build -f services/voting/Dockerfile -t ivxv/voting .
+make -C docker all
+```
