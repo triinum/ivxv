@@ -52,7 +52,7 @@ setup(
         'ivxv_admin.lib',
         'ivxv_admin.service',
     ],
-    package_dir={'': 'collector-admin'},
+    package_dir={'': 'services/collector-admin'},
     package_data={'ivxv_admin': ['templates/*.jinja', 'templates/*.json']},
     entry_points={
         'console_scripts': [

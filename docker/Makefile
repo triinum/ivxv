@@ -3,6 +3,7 @@
 # Or: make docker
 
 ROOT := $(abspath $(dir $(lastword $(MAKEFILE_LIST)))/..)
+SERVICES := $(ROOT)/services
 
 GO_SERVICES := \
 	proxy \
@@ -42,4 +43,4 @@ online: $(GO_SERVICES) $(OTHER_SERVICES)
 offline: $(OFFLINE_APPS)
 
 $(ALL_IMAGES):
-	docker build -f $(ROOT)/$@/Dockerfile -t ivxv/$@ $(ROOT)
+	docker build -f $(SERVICES)/$@/Dockerfile -t ivxv/$@ $(ROOT)

@@ -1,22 +1,23 @@
 #!/bin/bash
-# Shared build helper for IVXV Go microservices.
+# Shared build helper for IVXV Go microservices under services/<name>/.
 # Intended to run inside the builder stage with WORKDIR=/src (repo root).
 #
-# Usage: go-build.sh <service-dir>
+# Usage: go-build.sh <service-name>
+# Example: go-build.sh voting
 set -euo pipefail
 
-SERVICE="${1:?service directory required}"
+NAME="${1:?service name required}"
 ROOT="/src"
+SERVICE_DIR="services/${NAME}"
 
-if [[ ! -d "${ROOT}/${SERVICE}" ]]; then
-	echo "error: service directory not found: ${ROOT}/${SERVICE}" >&2
+if [[ ! -d "${ROOT}/${SERVICE_DIR}" ]]; then
+	echo "error: service directory not found: ${ROOT}/${SERVICE_DIR}" >&2
 	exit 1
 fi
 
 export GOTOOLCHAIN=local
 export CGO_ENABLED=0
 export GOBIN=/out
-# Scripts such as tlsciphersuites expect $GO (see common/go/govar.mk).
 export GO="${GO:-go}"
 
 mkdir -p "${GOBIN}"
@@ -29,19 +30,18 @@ ensure_core_replace() {
 		(
 			cd "${moddir}"
 			go mod edit -replace="tivi.io/core=${rel}"
-			# Keep go.sum consistent with the local replace.
 			go mod tidy
 		)
 	fi
 }
 
 ensure_core_replace "${ROOT}/common/collector" "../../core"
-ensure_core_replace "${ROOT}/${SERVICE}" "../core"
-if [[ -f "${ROOT}/sessionstatus/api/go.mod" ]]; then
-	ensure_core_replace "${ROOT}/sessionstatus/api" "../../core"
+ensure_core_replace "${ROOT}/${SERVICE_DIR}" "../../core"
+if [[ -f "${ROOT}/services/sessionstatus/api/go.mod" ]]; then
+	ensure_core_replace "${ROOT}/services/sessionstatus/api" "../../../core"
 fi
-if [[ -f "${ROOT}/sessionstatus/go.mod" && "${SERVICE}" == "sessionstatus" ]]; then
-	ensure_core_replace "${ROOT}/sessionstatus" "../core"
+if [[ "${NAME}" == "sessionstatus" ]]; then
+	ensure_core_replace "${ROOT}/services/sessionstatus" "../../core"
 fi
 
 # Ensure helper scripts copied from the build context are executable.
@@ -67,29 +67,27 @@ echo "==> codegen: common/tools/go + common/collector"
 )
 (
 	cd "${ROOT}/common/collector"
-	# Collector packages also declare generated error types.
 	go generate ./...
 	"${ROOT}/common/tools/go/bin/gen" -base "${ROOT}" ./...
 )
 
-# sessionstatus/api may also need generated types when present.
-if [[ -d "${ROOT}/sessionstatus/api" ]]; then
+if [[ -d "${ROOT}/services/sessionstatus/api" ]]; then
 	echo "==> codegen: sessionstatus/api"
 	(
-		cd "${ROOT}/sessionstatus/api"
+		cd "${ROOT}/services/sessionstatus/api"
 		go generate ./... || true
 		"${ROOT}/common/tools/go/bin/gen" -base "${ROOT}" ./...
 	)
 fi
 
-echo "==> build: ${SERVICE}"
+echo "==> build: ${SERVICE_DIR}"
 (
-	cd "${ROOT}/${SERVICE}"
+	cd "${ROOT}/${SERVICE_DIR}"
 	bash "${ROOT}/scripts/goimports.sh" ./...
 	go generate ./...
 	"${ROOT}/common/tools/go/bin/gen" -base "${ROOT}" ./...
 	go install ./...
 )
 
-echo "Built ${SERVICE} binaries into ${GOBIN}:"
+echo "Built ${NAME} binaries into ${GOBIN}:"
 ls -la "${GOBIN}"

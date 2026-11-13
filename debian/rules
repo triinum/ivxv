@@ -63,7 +63,7 @@ override_dh_auto_install:
 	#        documentation are.
 	dh_auto_install --package ivxv-admin --buildsystem pybuild --destdir debian/ivxv-admin/
 	install -d debian/ivxv-admin/etc/ssl/certs
-	cat collector-admin/sk-certs/*.crt > debian/ivxv-admin/etc/ssl/certs/sk-juur.crt
+	cat services/collector-admin/sk-certs/*.crt > debian/ivxv-admin/etc/ssl/certs/sk-juur.crt
 
 	# 1. `cp ivxv-admin-agent.service /lib/systemd/system/`
 	# 2. `systemctl enable ivxv-admin-agent.service`

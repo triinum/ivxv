@@ -52,15 +52,15 @@ def main():
 
     update_version("setup.py",
                    r"( +version=').+(',.*)", "\\g<1>%s\\2" % py_version)
-    update_version("collector-admin/ivxv_admin/__init__.py",
+    update_version("services/collector-admin/ivxv_admin/__init__.py",
                    r"(__version__ = ').+(')", "\\g<1>%s\\2" % py_version)
-    update_version("collector-admin/ivxv_admin/__init__.py",
+    update_version("services/collector-admin/ivxv_admin/__init__.py",
                    r"(DEB_PKG_VERSION = ').+(')", "\\g<1>%s\\2" % release)
     update_version("common/java/common-build.gradle",
                    "^(version ').+('.*)", "\\g<1>%s\\2" % release)
     update_version("tests/features/steps/__init__.py",
                    r"(DEB_VERSION = ').+(')", "\\g<1>%s\\2" % release)
-    update_version("collector-admin/site/ivxv/about.html",
+    update_version("services/collector-admin/site/ivxv/about.html",
                    r'(.+id="version">).+(<)', '\\g<1>%s\\2' % release)
     update_version("Documentation/documents.py",
                    r"^(release *= *').+('.*)", "\\g<1>%s\\2" % release)

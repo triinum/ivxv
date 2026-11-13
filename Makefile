@@ -1,5 +1,16 @@
-JAVADIRS    := common/java key processor auditor
-GODIRS      := common/collector sessionstatus/api proxy mid smartid choices voting verification storage votesorder webeid sessionstatus
+JAVADIRS    := common/java services/key services/processor services/auditor
+GODIRS      := common/collector \
+               services/sessionstatus/api \
+               services/proxy \
+               services/mid \
+               services/smartid \
+               services/choices \
+               services/voting \
+               services/verification \
+               services/storage \
+               services/votesorder \
+               services/webeid \
+               services/sessionstatus
 OTHERDIRS   := systemd Documentation
 
 TESTDIRS    := $(patsubst %,test-%,$(JAVADIRS) $(GODIRS))

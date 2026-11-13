@@ -1,12 +1,35 @@
 # IVXV microservices
 
-IVXV is split into independently developed and deployable microservices.
-Each service has its own module/package boundary, build, and `Dockerfile`.
+All deployable units live under `services/<name>/`. Each service directory
+contains its own source and a co-located `Dockerfile` so the service can be
+developed and released independently.
+
+```text
+services/
+  proxy/              # Dockerfile + Go module
+  choices/
+  voting/
+  verification/
+  storage/
+  sessionstatus/      # includes api/ client module
+  mid/
+  smartid/
+  webeid/
+  votesorder/
+  xroad-service/
+  collector-admin/
+  key/                # offline Java tool
+  processor/
+  auditor/
+common/               # shared libraries (not a deployable service)
+core/                 # crypto library (tivi.io/core)
+docker/               # shared build helpers only (no per-service Dockerfiles)
+```
 
 Build any service image from the repository root:
 
 ```bash
-docker build -f <service>/Dockerfile -t ivxv/<service> .
+docker build -f services/voting/Dockerfile -t ivxv/voting .
 ```
 
 Or build everything:
@@ -19,51 +42,35 @@ make docker
 
 | Service | Directory | Role |
 |---------|-----------|------|
-| **proxy** | `proxy/` | SNI/TLS dispatcher in front of other services (HAProxy) |
-| **choices** | `choices/` | Voter/choices/district list service |
-| **voting** | `voting/` | Vote acceptance, eligibility, qualification |
-| **verification** | `verification/` | Vote verification for the control app |
-| **storage** | `storage/` | Election data storage (etcd-backed) |
-| **sessionstatus** | `sessionstatus/` | Session status tracking |
-| **mid** | `mid/` | Mobile-ID authentication helper |
-| **smartid** | `smartid/` | Smart-ID authentication helper |
-| **webeid** | `webeid/` | Web eID authentication helper |
-| **votesorder** | `votesorder/` | Vote order / running list feed |
-| **xroad-service** | `xroad-service/` | X-Road ↔ votesorder bridge |
-| **collector-admin** | `collector-admin/` | Collector management API / UI backend |
+| **proxy** | `services/proxy/` | SNI/TLS dispatcher (HAProxy) |
+| **choices** | `services/choices/` | Voter/choices/district lists |
+| **voting** | `services/voting/` | Vote acceptance and qualification |
+| **verification** | `services/verification/` | Vote verification |
+| **storage** | `services/storage/` | Election data storage (etcd) |
+| **sessionstatus** | `services/sessionstatus/` | Session status tracking |
+| **mid** | `services/mid/` | Mobile-ID helper |
+| **smartid** | `services/smartid/` | Smart-ID helper |
+| **webeid** | `services/webeid/` | Web eID helper |
+| **votesorder** | `services/votesorder/` | Vote order feed |
+| **xroad-service** | `services/xroad-service/` | X-Road bridge |
+| **collector-admin** | `services/collector-admin/` | Management API / UI backend |
 
-Shared Go libraries used by collector services (not deployable services themselves):
+Shared libraries (not services):
 
-- `common/collector` — shared collector framework
-- `sessionstatus/api` — session-status client API module
+- `common/collector` — collector framework
+- `services/sessionstatus/api` — session-status client API
 - `core` (`tivi.io/core`) — crypto primitives
 
 ## Offline processing applications
 
-These are not request-serving microservices, but they are developed and
-containerized separately for the post-voting workflow:
-
 | Application | Directory | Role |
 |-------------|-----------|------|
-| **processor** | `processor/` | Ballot-box validation and anonymization |
-| **key** | `key/` | Key generation and decryption |
-| **auditor** | `auditor/` | Audit / proof verification |
+| **processor** | `services/processor/` | Ballot-box validation / anonymization |
+| **key** | `services/key/` | Key generation and decryption |
+| **auditor** | `services/auditor/` | Audit / proof verification |
 
 ## Independent development
 
-Each service directory is the unit of development:
-
-1. Change code under that service (and shared libs only when needed).
-2. Build and test the service image with its own `Dockerfile`.
-3. Run with election/technical/trust configuration mounted at `/etc/ivxv`.
-
-Go services keep local `replace` directives to `common/collector` and
-`sessionstatus/api` so they can be built from the monorepo without publishing
-those modules first. Docker builds additionally point `tivi.io/core` at the
-in-repo `core/` module.
-
-## Compose stack
-
-`docker-compose.yml` builds the online services for local integration work.
-Configuration and TLS material must be supplied via `./config` (see comments
-in the compose file). Storage depends on etcd.
+1. Work in `services/<name>/` (and shared libs only when needed).
+2. Build with that directory’s `Dockerfile`.
+3. Mount election/technical/trust config at `/etc/ivxv` when running.

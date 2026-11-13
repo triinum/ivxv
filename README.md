@@ -14,19 +14,17 @@ Please refer to www.valimised.ee for further information.
 Microservices
 -------------
 
-The collector is split into independently developed microservices. Each service
-lives in its own top-level directory with its own module boundary and
-``Dockerfile``. See ``SERVICES.md`` for the full service map.
+Deployable units live under ``services/<name>/``. Each service directory
+contains its own source **and** ``Dockerfile``. See ``SERVICES.md``.
 
 Build a single service image (from the repository root)::
 
-        docker build -f voting/Dockerfile -t ivxv/voting .
+        docker build -f services/voting/Dockerfile -t ivxv/voting .
 
 Build all service images::
 
         make docker
 
-Or use Compose for local wiring (configuration must be provided under
-``./config``)::
+Or use Compose for local wiring (configuration under ``./config``)::
 
         docker compose build

@@ -1,12 +1,12 @@
 # Local IVXV collector microservice stack.
 #
+# Each service lives under services/<name>/ with a co-located Dockerfile.
+#
 # Build images:
 #   docker compose build
 #
 # Services expect IVXV configuration containers under ./config mounted at
-# /etc/ivxv (trust, election, technical, and per-instance sensitive material).
-# Without that configuration the processes will exit after config checks —
-# the compose file is primarily for independent image builds and wiring.
+# /etc/ivxv. Without that configuration the processes exit after config checks.
 
 services:
   etcd:
@@ -21,7 +21,7 @@ services:
   storage:
     build:
       context: .
-      dockerfile: storage/Dockerfile
+      dockerfile: services/storage/Dockerfile
     image: ivxv/storage
     volumes:
       - ./config:/etc/ivxv:ro
@@ -31,7 +31,7 @@ services:
   sessionstatus:
     build:
       context: .
-      dockerfile: sessionstatus/Dockerfile
+      dockerfile: services/sessionstatus/Dockerfile
     image: ivxv/sessionstatus
     volumes:
       - ./config:/etc/ivxv:ro
@@ -39,7 +39,7 @@ services:
   choices:
     build:
       context: .
-      dockerfile: choices/Dockerfile
+      dockerfile: services/choices/Dockerfile
     image: ivxv/choices
     volumes:
       - ./config:/etc/ivxv:ro
@@ -50,7 +50,7 @@ services:
   voting:
     build:
       context: .
-      dockerfile: voting/Dockerfile
+      dockerfile: services/voting/Dockerfile
     image: ivxv/voting
     volumes:
       - ./config:/etc/ivxv:ro
@@ -61,7 +61,7 @@ services:
   verification:
     build:
       context: .
-      dockerfile: verification/Dockerfile
+      dockerfile: services/verification/Dockerfile
     image: ivxv/verification
     volumes:
       - ./config:/etc/ivxv:ro
@@ -72,7 +72,7 @@ services:
   mid:
     build:
       context: .
-      dockerfile: mid/Dockerfile
+      dockerfile: services/mid/Dockerfile
     image: ivxv/mid
     volumes:
       - ./config:/etc/ivxv:ro
@@ -82,7 +82,7 @@ services:
   smartid:
     build:
       context: .
-      dockerfile: smartid/Dockerfile
+      dockerfile: services/smartid/Dockerfile
     image: ivxv/smartid
     volumes:
       - ./config:/etc/ivxv:ro
@@ -92,7 +92,7 @@ services:
   webeid:
     build:
       context: .
-      dockerfile: webeid/Dockerfile
+      dockerfile: services/webeid/Dockerfile
     image: ivxv/webeid
     volumes:
       - ./config:/etc/ivxv:ro
@@ -102,7 +102,7 @@ services:
   votesorder:
     build:
       context: .
-      dockerfile: votesorder/Dockerfile
+      dockerfile: services/votesorder/Dockerfile
     image: ivxv/votesorder
     volumes:
       - ./config:/etc/ivxv:ro
@@ -112,7 +112,7 @@ services:
   proxy:
     build:
       context: .
-      dockerfile: proxy/Dockerfile
+      dockerfile: services/proxy/Dockerfile
     image: ivxv/proxy
     ports:
       - "443:443"
@@ -129,7 +129,7 @@ services:
   xroad-service:
     build:
       context: .
-      dockerfile: xroad-service/Dockerfile
+      dockerfile: services/xroad-service/Dockerfile
     image: ivxv/xroad-service
     ports:
       - "8081:8080"
@@ -139,7 +139,7 @@ services:
   collector-admin:
     build:
       context: .
-      dockerfile: collector-admin/Dockerfile
+      dockerfile: services/collector-admin/Dockerfile
     image: ivxv/collector-admin
     ports:
       - "8080:8080"
@@ -147,25 +147,24 @@ services:
       - ./config:/etc/ivxv
       - admin-data:/var/lib/ivxv
 
-  # Offline tools — buildable independently; not part of the online path.
   key:
     build:
       context: .
-      dockerfile: key/Dockerfile
+      dockerfile: services/key/Dockerfile
     image: ivxv/key
     profiles: ["offline"]
 
   processor:
     build:
       context: .
-      dockerfile: processor/Dockerfile
+      dockerfile: services/processor/Dockerfile
     image: ivxv/processor
     profiles: ["offline"]
 
   auditor:
     build:
       context: .
-      dockerfile: auditor/Dockerfile
+      dockerfile: services/auditor/Dockerfile
     image: ivxv/auditor
     profiles: ["offline"]
 
