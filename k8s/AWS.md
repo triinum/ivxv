@@ -51,8 +51,9 @@ Seega AWS-is:
           │           │                │
           └───────────┴───────┬────────┘
                               ▼
-                    storage / etcd / sessionstatus
-                 (ainult privaatne VPC / ClusterIP)
+                    storage / PostgreSQL (RDS) / sessionstatus
+                 (ainult privaatne VPC / ClusterIP;
+                  etcd asemel protocol: postgres)
 ```
 
 **Ära** pane interneti-koormusjaoturit `voting`, `choices`, `storage` ega

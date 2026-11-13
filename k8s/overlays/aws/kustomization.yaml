@@ -21,7 +21,7 @@ patches:
   - path: patches/patch-votesorder.yaml
   - path: patches/patch-xroad-service.yaml
   - path: patches/patch-collector-admin.yaml
-  - path: patches/patch-etcd.yaml
+  - path: patches/delete-incluster-postgres.yaml
   - path: patches/patch-proxy-service.yaml
 images:
   - name: ivxv/proxy

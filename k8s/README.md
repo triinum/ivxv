@@ -7,17 +7,20 @@ environment **overlays**.
 k8s/
   base/                     # shared desired state per service
     <service>/              # Deployment + Service (apply alone if needed)
-    etcd/                   # storage backend
+    postgres/               # PutGetter backend (dev/staging/prod in-cluster)
+    etcd/                   # legacy backend (optional; not in default base)
     config/                 # placeholder Secrets for /etc/ivxv
     kustomization.yaml      # full collector stack
   overlays/
     dev/                    # local / CI-like: 1 replica, light resources
     staging/                # more replicas + Ingress
     prod/                   # HA replicas + Ingress
-    aws/                    # ECR images + public NLB on proxy only
+    aws/                    # ECR + NLB→proxy; Postgres via RDS (no in-cluster DB)
 ```
 
 AWS (ECR → EKS → NLB only in front of proxy): see **`AWS.md`**.
+Storage protocol: set `technical.storage.protocol` to `postgres` (default path)
+or `etcd` (legacy). See `common/collector/storage/postgres`.
 
 ## Services covered
 
@@ -27,7 +30,7 @@ AWS (ECR → EKS → NLB only in front of proxy): see **`AWS.md`**.
 | choices | 443 | `base/choices` |
 | voting | 443 | `base/voting` |
 | verification | 443 | `base/verification` |
-| storage | 2379 | `base/storage` |
+| storage | 2379 | `base/storage` (etcd controller **or** postgres health) |
 | sessionstatus | 443 | `base/sessionstatus` |
 | mid | 443 | `base/mid` |
 | smartid | 443 | `base/smartid` |
@@ -35,7 +38,8 @@ AWS (ECR → EKS → NLB only in front of proxy): see **`AWS.md`**.
 | votesorder | 443 | `base/votesorder` |
 | xroad-service | 8080 | `base/xroad-service` |
 | collector-admin | 8080 | `base/collector-admin` |
-| etcd | 2379/2380 | `base/etcd` |
+| postgres | 5432 | `base/postgres` (dev; AWS uses RDS) |
+| etcd | 2379/2380 | `base/etcd` (legacy, optional) |
 
 Offline tools (`key`, `processor`, `auditor`) are not long-running Deployments;
 run them as Jobs/CI or locally from their Docker images.
