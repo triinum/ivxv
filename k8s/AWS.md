@@ -1,29 +1,99 @@
-# AWS deployment (ECR + EKS)
+# AWS-i evitamise juhend (ECR + EKS)
 
-Yes — the intended path on AWS is:
+See juhend selgitab, kuidas IVXV mikroteenused Amazon Web Services’isse viia,
+kasutades selles repos juba olevaid `services/*/Dockerfile` faile ja `k8s/`
+Kustomize manifestid.
 
-1. **Build** each service image from `services/<name>/Dockerfile`
-2. **Push** images to **Amazon ECR**
-3. **Create** an **Amazon EKS** cluster
-4. **Apply** the existing Kustomize manifests (`kubectl apply -k …`)
-5. **Expose** public traffic **only** through the **proxy** (load balancer); keep all other microservices on the cluster-private network (`ClusterIP`)
+## Mida me teeme (lühidalt)
 
-That matches IVXV’s design: proxy is the single internet entry point (SNI/TLS dispatch); choices, voting, verification, storage, mid, … talk to each other inside the VPC.
+1. **Ehitame** igast teenuse `Dockerfile`-ist Dockeri tõmmise ja **laeme** need
+   üles **Amazon ECR** konteinerite registrisse.
+2. **Loome** AWS-is **Amazon EKS** (Kubernetes) klastri ja **käivitame** kõik
+   teenused korraga olemasolevate `k8s/` seadistusfailide abil
+   (`kubectl apply`).
+3. **Suuname** avaliku liikluse läbi koormusjaoturi **ainult proxy teenusele**,
+   jättes ülejäänud mikroteenused omavaheliseks suhtluseks **privaatvõrku**.
+
+See järjekord on teadlik: kõigepealt on olemas käivitatavad tõmmised (ECR),
+siis koht kus neid jooksutada (EKS), siis võrgureegel et internet ei näeks
+midagi peale proxy.
+
+## Miks just nii?
+
+IVXV kogumisteenus on juba disainitud mikroteenustena. **Proxy** on ainus
+avalik sisenemispunkt: klient ühendub TLS-iga, paneb SNI-sse soovitud teenuse
+nime, ja proxy vahendab liiklust edasi (ilma TLS-sessiooni sisu nägemata).
+
+Seega AWS-is:
+
+| Komponent | Roll |
+|-----------|------|
+| **ECR** | Iga teenuse Docker-tõmmise hoidla (nagu privaatne Docker Hub) |
+| **EKS** | Kubernetes, kus jooksevad kõik pod’id / teenused |
+| **NLB → proxy** | Ainus internetist nähtav uks (TCP 443) |
+| **ClusterIP teenused** | Ülejäänud mikroteenused — ainult klastri / VPC sees |
 
 ```text
-Internet
-   │
-   ▼
-AWS NLB (TCP 443) ──► proxy  ──SNI/TLS──► choices / voting / …
-                         │                    mid / smartid / …
-                         └──────────────────► verification / …
-Private VPC / EKS only:   storage, sessionstatus, votesorder,
-                          xroad-service, collector-admin, etcd
+                    Internet (valija / kontrollrakendus)
+                              │
+                              ▼
+                 ┌─────────────────────────┐
+                 │  AWS NLB  (TCP :443)    │  ← avalik koormusjaotur
+                 └────────────┬────────────┘
+                              │
+                              ▼
+                 ┌─────────────────────────┐
+                 │  proxy  (EKS pod)       │  ← SNI põhjal edasi
+                 └────────────┬────────────┘
+          ┌───────────┬───────┴────────┬────────────┐
+          ▼           ▼                ▼            ▼
+      choices      voting        verification      mid / …
+          │           │                │
+          └───────────┴───────┬────────┘
+                              ▼
+                    storage / etcd / sessionstatus
+                 (ainult privaatne VPC / ClusterIP)
 ```
 
-## 1. Build and push to ECR
+**Ära** pane interneti-koormusjaoturit `voting`, `choices`, `storage` ega
+muude teenuste ette. Need peavad jääma privaatseks.
 
-Replace `ACCOUNT`, `REGION`, and `TAG` (example: `prod` or a git SHA).
+`collector-admin` (haldus) jäägu samuti privaatseks — ligipääs VPN-i,
+bastioni või `kubectl port-forward` kaudu, mitte avaliku URL-iga.
+
+---
+
+## Eeldused
+
+Enne alustamist oleks vaja:
+
+- AWS konto, õigused ECR / EKS / VPC / ELB peale
+- Kohalikud tööriistad: `docker`, `aws` CLI, `kubectl` (soovituslikult ka
+  `eksctl` või Terraform klastri loomiseks)
+- Repo juurkaustas töötamine (Dockerfile’ide `COPY` teed eeldavad seda)
+- IVXV seadistusmaterjal (trust / election / technical jms), mida hiljem
+  Secret’ina klastrisse panna
+
+Muutujad, mida allpool asendada:
+
+| Muutuja | Näide | Tähendus |
+|---------|-------|----------|
+| `ACCOUNT` | `123456789012` | AWS account ID |
+| `REGION` | `eu-north-1` | AWS piirkond |
+| `TAG` | `a1b2c3d` või `prod` | Tõmmise silt (soovituslikult git SHA) |
+| `CLUSTER` | `ivxv` | EKS klastri nimi |
+
+---
+
+## Samm 1 — Docker-tõmmised ECR-i
+
+### Mis toimub?
+
+Iga teenuse kaustas (`services/<nimi>/`) on oma `Dockerfile`. Sellest ehitatakse
+konteineritõmmis. ECR on AWS-i privaatne konteineriregister: EKS sõlmed
+tõmbavad hiljem tõmmised sealt, mitte su arvutist.
+
+### Kuidas
 
 ```bash
 ACCOUNT=123456789012
@@ -31,6 +101,7 @@ REGION=eu-north-1
 TAG=$(git rev-parse --short HEAD)
 REGISTRY="${ACCOUNT}.dkr.ecr.${REGION}.amazonaws.com"
 
+# Logi ECR-i sisse
 aws ecr get-login-password --region "$REGION" \
   | docker login --username AWS --password-stdin "$REGISTRY"
 
@@ -40,81 +111,177 @@ SERVICES=(
 )
 
 for s in "${SERVICES[@]}"; do
+  # Loo repositoorium, kui seda veel pole
   aws ecr describe-repositories --repository-names "ivxv/${s}" --region "$REGION" \
-    >/dev/null 2>&1 || aws ecr create-repository --repository-name "ivxv/${s}" --region "$REGION"
+    >/dev/null 2>&1 \
+    || aws ecr create-repository --repository-name "ivxv/${s}" --region "$REGION"
 
+  # Ehita alati repo JUUREST (-f osutab teenuse Dockerfile'ile)
   docker build -f "services/${s}/Dockerfile" -t "ivxv/${s}:${TAG}" .
   docker tag "ivxv/${s}:${TAG}" "${REGISTRY}/ivxv/${s}:${TAG}"
   docker push "${REGISTRY}/ivxv/${s}:${TAG}"
 done
 ```
 
-Point the AWS overlay at your registry (edit `k8s/overlays/aws/kustomization.yaml` `images:` block, or):
+### Seosta Kustomize overlay ECR aadressidega
+
+Fail `k8s/overlays/aws/kustomization.yaml` sisaldab kohatäiteid
+`ACCOUNT.dkr.ecr.REGION.amazonaws.com/...`. Asenda need päris väärtustega,
+nt:
 
 ```bash
 cd k8s/overlays/aws
-# example for one service; repeat / script for all
-kustomize edit set image "ivxv/proxy=${REGISTRY}/ivxv/proxy:${TAG}"
+for s in proxy choices voting verification storage sessionstatus \
+         mid smartid webeid votesorder xroad-service collector-admin; do
+  kustomize edit set image "ivxv/${s}=${REGISTRY}/ivxv/${s}:${TAG}"
+done
+cd -
 ```
 
-## 2. EKS cluster
+Või muuda `images:` plokki käsitsi redaktoriga.
 
-Create a cluster in private subnets for worker nodes (public subnets only as needed for the NLB). Wire `kubectl`:
+---
+
+## Samm 2 — EKS klaster
+
+### Mis toimub?
+
+EKS on hallatud Kubernetes. Klastris jooksevad kõik IVXV teenuste pod’id.
+Töösõlmed (worker nodes) võiksid olla **privaatsetes** alamvõrkudes; avalikke
+alamvõrke vaja peamiselt NLB / NAT jaoks.
+
+### Kuidas (kontseptsioon)
+
+1. Loo VPC (või kasuta olemasolevat) privaatsete + avalike alamvõrkudega.
+2. Loo EKS klaster (`eksctl`, Console või IaC).
+3. Paigalda / kontrolli lisandmooduleid: VPC CNI, CoreDNS, kube-proxy.
+4. **AWS Load Balancer Controller** on soovituslik, et `Service type:
+   LoadBalancer` looks lookseks korralikult NLB-ks.
+5. Veendu, et sõlmede IAM roll lubab ECR-ist tõmmiseid tõmmata.
+
+Ühenda `kubectl` klastriga:
 
 ```bash
-aws eks update-kubeconfig --region "$REGION" --name ivxv
+aws eks update-kubeconfig --region "$REGION" --name "$CLUSTER"
+kubectl get nodes
 ```
 
-Install the usual cluster add-ons (VPC CNI, CoreDNS, kube-proxy; for NLB, the AWS Load Balancer Controller is recommended).
+---
 
-## 3. Apply Kubernetes manifests
+## Samm 3 — Käivita teenused `k8s/` manifestidega
 
-Populate `ivxv-config` (and `xroad-service-config`) Secrets with real election material before expecting services to stay up — see `base/config/`.
+### Mis toimub?
+
+`k8s/base/` kirjeldab iga teenuse Deployment’i ja Service’i.
+`k8s/overlays/aws/` võtab selle baasi ja lisab:
+
+- nimeruumi `ivxv-aws`
+- ECR-i image’id
+- mõistlikud replica / resource väärtused
+- **ainult proxy** peale interneti-suunalise NLB (`LoadBalancer`)
+
+Ülejäänud teenused jäävad `ClusterIP` — neid näeb ainult klaster (privaatvõrk).
+
+### Seadistus (Secret)
+
+Enne kui teenused päriselt tööle jäävad, vaja `/etc/ivxv` sisu (trust,
+election, technical jms). Overlay kasutab Secret’it `ivxv-config`
+(vt `k8s/base/config/`). Täida see päris materjaliga; muidu protsessid
+lõpetavad pärast seadistuse kontrolli.
+
+`xroad-service` kasutab eraldi Secret’it `xroad-service-config`.
+
+### Käivitus
 
 ```bash
-# Preview
+# Vaata, mis rakendub (kuivjooks)
 kubectl kustomize k8s/overlays/aws
 
-# Deploy full stack into namespace ivxv-aws
+# Rakenda kogu stack
 kubectl apply -k k8s/overlays/aws
+
+# Olek
+kubectl -n ivxv-aws get pods,svc
 ```
 
-What this overlay does on top of `k8s/base`:
-
-| Concern | Behaviour |
-|---------|-----------|
-| Images | `ACCOUNT.dkr.ecr.REGION.amazonaws.com/ivxv/<service>:…` |
+| Overlay väli | Käitumine |
+|--------------|-----------|
+| Images | ECR (`…amazonaws.com/ivxv/<teenus>:…`) |
 | Namespace | `ivxv-aws` |
-| Public entry | **only** `proxy` → `Service type: LoadBalancer` (AWS NLB, TCP 443) |
-| Other services | remain `ClusterIP` (private) |
-| Admin UI | **not** published on the internet (use VPN / bastion / port-forward) |
+| Avalik sissepääs | **ainult** `proxy` → NLB, port 443 |
+| Teised teenused | `ClusterIP` (privaatne) |
+| Admin | **ei** ole avalik Ingress/LB |
 
-## 4. Public traffic only to proxy
+---
 
-After apply, wait for the NLB hostname:
+## Samm 4 — Avalik liiklus ainult proxyle
+
+### Mis toimub?
+
+Kui `proxy` Service on `LoadBalancer` + AWS annotatsioonid, loob AWS
+**Network Load Balancer**i TCP 443 peale. NLB ei lõpeta TLS-i — see
+edastab baidid proxy pod’ile (*passthrough*), et SNI ja IVXV TLS mudel
+säiliks.
+
+### DNS
 
 ```bash
 kubectl -n ivxv-aws get svc proxy
 ```
 
-Point your public DNS (e.g. vote.example.ee) at that NLB. Clients connect with TLS SNI as in IVXV; the proxy forwards to internal services without terminating the voter TLS session in the load balancer (TCP passthrough).
+Oota, kuni `EXTERNAL-IP` / hostname ilmub. Seo avalik DNS nimi (nt
+`vote.example.ee`) selle NLB külge (Route 53 alias või CNAME).
 
-Do **not** put an internet-facing load balancer in front of `voting`, `choices`, `storage`, etc. Those must stay private.
+### Siseturundus klastris
 
-`collector-admin` should stay private as well (management plane). Access via VPN, SSM bastion, or:
+IVXV technical seadistuses peaksid proxy backend’id kasutama **klastri DNS
+nimesid**, nt `voting`, `choices`, `verification` (Kubernetes Service’i nimed
+nimeruumis `ivxv-aws`), mitte avalikke hostinimesid.
+
+### Haldusliides
 
 ```bash
+# Ajutine turvaline ligipääs adminile (ainult sinu masinale)
 kubectl -n ivxv-aws port-forward svc/collector-admin 8080:8080
 ```
 
-## Checklist
+Tootmises eelistada VPN-i või bastioni, mitte avalikku Ingressit.
 
-- [ ] Every online service image built from `services/<name>/Dockerfile` and pushed to ECR
-- [ ] EKS nodes can pull from ECR (node role / IRSA image pull)
-- [ ] `ivxv-config` Secret filled
-- [ ] `kubectl apply -k k8s/overlays/aws` succeeds
-- [ ] Only `proxy` has an internet-facing LB
-- [ ] DNS → NLB on port 443
-- [ ] Technical config inside IVXV uses in-cluster DNS names (`voting`, `choices`, …) as backends for the proxy
+---
 
-Offline tools (`key`, `processor`, `auditor`) are not part of this long-running stack; run them as Jobs/CI or on secured operators’ hosts from their ECR images if needed.
+## Offline tööriistad
+
+`key`, `processor` ja `auditor` **ei** ole pikaajalised online-teenused.
+Neid ei pea EKS-is kogu aeg jooksma. Vajadusel:
+
+- ehita / pushi nende Dockerfile’id samuti ECR-i, või
+- käivita turvalisel operaatori masinal / CI Job’ina pärast hääletust
+
+---
+
+## Kontrollnimekiri
+
+- [ ] Iga online-teenuse tõmmis on ehitatud `services/<nimi>/Dockerfile`-ist
+- [ ] Tõmmised on ECR-is; EKS sõlmed saavad neid tõmmata
+- [ ] `k8s/overlays/aws` image’id viitavad õigele `ACCOUNT` / `REGION` / `TAG`
+- [ ] `ivxv-config` (ja vajadusel `xroad-service-config`) on täidetud
+- [ ] `kubectl apply -k k8s/overlays/aws` õnnestus; pod’id on Ready
+- [ ] Ainult `proxy` Service on `LoadBalancer` / internet-facing
+- [ ] DNS → NLB :443
+- [ ] Teised teenused on `ClusterIP`; technical config kasutab klastri DNS-i
+- [ ] `collector-admin` ei ole avalikult avatud
+
+---
+
+## Seotud failid selles repos
+
+| Tee | Sisu |
+|-----|------|
+| `services/README.md` | Dockerfile’ide struktuur ja build |
+| `k8s/README.md` | Kustomize base / overlay ülevaade |
+| `k8s/base/<teenus>/` | Deployment + Service baas |
+| `k8s/overlays/aws/` | AWS-spetsiifiline overlay (ECR + proxy NLB) |
+| `docker-compose.yml` | Kohalik (mitte-AWS) jooks |
+
+Küsimuste korral: alusta alati `kubectl kustomize k8s/overlays/aws`
+väljundi ülevaatamisest — seal on näha, mis päriselt klastrisse läheb.
