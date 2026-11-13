@@ -39,26 +39,41 @@ Internet → NLB / Ingress → proxy (:443)
 │   ├── aws.md                ← ECR + EKS + NLB
 │   └── terraform-vs-ansible.md
 │
-├── services/                 ← üks kaust = üks teenus (selgitus)
+├── services/                 ← üks kaust = üks teenus (+ oma Dockerfile)
 │   ├── proxy/
+│   │   └── Dockerfile
 │   ├── choices/
+│   │   └── Dockerfile
 │   ├── voting/
+│   │   └── Dockerfile
 │   ├── verification/
+│   │   └── Dockerfile
 │   ├── storage/
+│   │   └── Dockerfile
 │   ├── sessionstatus/
+│   │   └── Dockerfile
 │   ├── mid/
+│   │   └── Dockerfile
 │   ├── smartid/
+│   │   └── Dockerfile
 │   ├── webeid/
+│   │   └── Dockerfile
 │   ├── votesorder/
+│   │   └── Dockerfile
 │   ├── xroad-service/
+│   │   └── Dockerfile
 │   ├── collector-admin/
+│   │   └── Dockerfile
 │   ├── key/                  ← offline (Java)
+│   │   └── Dockerfile
 │   ├── processor/            ← offline
+│   │   └── Dockerfile
 │   └── auditor/              ← offline
+│       └── Dockerfile
 │
 ├── common/                   ← jagatud teegid (ei ole teenus)
 ├── core/                     ← krüpto (ei ole teenus)
-├── docker/                   ← build helper’id (Dockerfile’id on services/ all)
+├── docker/                   ← ainult build helper’id (mitte teenuste Dockerfile’id)
 │
 ├── k8s/
 │   ├── AWS.md
