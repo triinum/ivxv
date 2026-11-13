@@ -1,29 +1,4 @@
-# IVXV arhitektuur — selgitused meeskonnale
-
-See repo **ei sisalda lähtekoodi**. Siin on sama kaustapuu mis koodilahenduses,
-aga iga kausta juures on lühike selgitus: mis see on ja miks see olemas on.
-
-Kood ja Dockerfailid: [triinum/ivxv](https://github.com/triinum/ivxv)
-(haru `cursor/microservices-dockerfiles-625e`).
-
-## Suur pilt
-
-```text
-Internet → NLB / Ingress → proxy (:443)
-                              │
-              ┌───────────────┼───────────────┐
-              ▼               ▼               ▼
-           voting         choices      verification …
-              │               │               │
-              └───────┬───────┴───────┬───────┘
-                      ▼               ▼
-                sessionstatus      storage → etcd
-```
-
-- **proxy** on ainus avalik sissepääs (SNI/TLS).
-- Ülejäänud teenused on klastris privaatsed (`ClusterIP`).
-- AWS-is **Ingressit ei ole vaja** — NLB → proxy.
-- Terraform loob infra (VPC/ECR/EKS); Ansible ehitab/pushib/rakendab.
+# IVXV arhitektuur 
 
 ## Kaustapuu
 
@@ -104,11 +79,3 @@ Internet → NLB / Ingress → proxy (:443)
     │   └── k8s_apply/        ← kubectl apply -k
     └── inventory/            ← aws_dev / aws_prod muutujad
 ```
-
-## Kuidas lugeda
-
-1. See README + [`SERVICES.md`](SERVICES.md)
-2. [`arhitektuur/ylevaade.md`](arhitektuur/ylevaade.md) ja [`andmevoog.md`](arhitektuur/andmevoog.md)
-3. Vajadusel üksik teenus: `services/<nimi>/README.md`
-4. Kubernetes / AWS: `k8s/` ja [`arhitektuur/aws.md`](arhitektuur/aws.md)
-5. Infra vs ops: [`arhitektuur/terraform-vs-ansible.md`](arhitektuur/terraform-vs-ansible.md)
