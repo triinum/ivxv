@@ -79,3 +79,48 @@
     │   └── k8s_apply/        ← kubectl apply -k
     └── inventory/            ← aws_dev / aws_prod muutujad
 ```
+
+## Kuidas etcd asendada Postgresiga
+
+See **ei ole** lihtsalt seadistuse vahetus. etcd on üks `PutGetter`
+protokolle; Postgresi jaoks tuleb kirjutada **uus protokoll** sama liidese peale.
+
+```text
+teenused → storage.Client → PutGetter → etcd | file | memory
+                                         └── (+ postgres, kui implementeerid)
+```
+
+Liides (`common/collector/storage` koodirepos): `Put`, `Get`, `GetWithPrefix`,
+`CAS`, `GetWithSerial` (+ valikuline `Batcher` / txn).
+
+### Sammud
+
+1. **Uus pakk** nt `common/collector/storage/postgres/`
+   - `init()`: `storage.Register("postgres", …)`
+   - tabel nt `(key TEXT PRIMARY KEY, value BYTEA, serial BIGSERIAL)`
+   - `Put` = `INSERT` (konflikt → võti juba olemas)
+   - `Get` / `GetWithPrefix` (`LIKE 'prefix%'`) / `CAS` (tehing + `UPDATE … WHERE value = old`) / `GetWithSerial`
+2. **Technical config**
+   ```yaml
+   storage:
+     protocol: postgres
+     conf:
+       # DSN / host / SSL
+   ```
+3. **Infra**
+   - EKS-is etcd StatefulSet ära (või ära kasuta)
+   - RDS PostgreSQL (Multi-AZ)
+   - teenustele DB ligipääs (IRSA / Secret)
+4. **`services/storage` roll**
+   - etcd bootstrap/prune enam ei vaja
+   - õhuke client või otse Postgres (nagu praegu etcd client)
+
+### Oluline
+
+| | |
+|--|--|
+| Semantika | `Put` **ei kirjuta üle** — ainult uued võtmed; overwrite peamiselt `CAS` |
+| Indeksid | prefix-päringud vajavad head `key` indeksit |
+| Ei ole SQL ORM | ärikiht jääb võti–väärtus; Postgres on backend |
+| Alternatiiv | DynamoDB sobib KV-le sageli loomulikumalt kui SQL |
+| Staatus | koodirepos `postgres` protokolli **veel ei ole** — ainult `etcd` / `file` / `memory` |
