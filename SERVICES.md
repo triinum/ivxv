@@ -25,9 +25,9 @@ arendada ja avaldada.
 
 | Rakendus | Kaust | Roll |
 |----------|-------|------|
-| **key** | `services/key/` | Võtmete genereerimine / dekrüpteerimine |
-| **processor** | `services/processor/` | Häältekasti valideerimine / anonüümimine |
-| **auditor** | `services/auditor/` | Auditeerimine / tõestuste kontroll |
+| **processor** | `services/processor/` | Offline toru: check → squash → revoke → anonymize |
+| **key** | `services/key/` | Võtmed (sh nutikaardi jagud), dekrüpteerimine + tõestused |
+| **auditor** | `services/auditor/` | Shuffle/decrypt tõestused; processor’i auditirada |
 
 ## Jagatud (ei ole teenused)
 
