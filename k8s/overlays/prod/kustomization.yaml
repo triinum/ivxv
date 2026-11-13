@@ -1,0 +1,62 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: ivxv-prod
+labels:
+  - pairs:
+      environment: prod
+    includeSelectors: false
+resources:
+  - namespace.yaml
+  - ../../base
+  - ingress.yaml
+patches:
+  - path: patches/patch-proxy.yaml
+  - path: patches/patch-choices.yaml
+  - path: patches/patch-voting.yaml
+  - path: patches/patch-verification.yaml
+  - path: patches/patch-storage.yaml
+  - path: patches/patch-sessionstatus.yaml
+  - path: patches/patch-mid.yaml
+  - path: patches/patch-smartid.yaml
+  - path: patches/patch-webeid.yaml
+  - path: patches/patch-votesorder.yaml
+  - path: patches/patch-xroad-service.yaml
+  - path: patches/patch-collector-admin.yaml
+  - path: patches/patch-etcd.yaml
+images:
+  - name: ivxv/proxy
+    newName: ivxv/proxy
+    newTag: prod
+  - name: ivxv/choices
+    newName: ivxv/choices
+    newTag: prod
+  - name: ivxv/voting
+    newName: ivxv/voting
+    newTag: prod
+  - name: ivxv/verification
+    newName: ivxv/verification
+    newTag: prod
+  - name: ivxv/storage
+    newName: ivxv/storage
+    newTag: prod
+  - name: ivxv/sessionstatus
+    newName: ivxv/sessionstatus
+    newTag: prod
+  - name: ivxv/mid
+    newName: ivxv/mid
+    newTag: prod
+  - name: ivxv/smartid
+    newName: ivxv/smartid
+    newTag: prod
+  - name: ivxv/webeid
+    newName: ivxv/webeid
+    newTag: prod
+  - name: ivxv/votesorder
+    newName: ivxv/votesorder
+    newTag: prod
+  - name: ivxv/xroad-service
+    newName: ivxv/xroad-service
+    newTag: prod
+  - name: ivxv/collector-admin
+    newName: ivxv/collector-admin
+    newTag: prod

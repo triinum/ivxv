@@ -1,0 +1,62 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: ivxv-aws
+labels:
+  - pairs:
+      environment: aws
+    includeSelectors: false
+resources:
+  - namespace.yaml
+  - ../../base
+patches:
+  - path: patches/patch-proxy.yaml
+  - path: patches/patch-choices.yaml
+  - path: patches/patch-voting.yaml
+  - path: patches/patch-verification.yaml
+  - path: patches/patch-storage.yaml
+  - path: patches/patch-sessionstatus.yaml
+  - path: patches/patch-mid.yaml
+  - path: patches/patch-smartid.yaml
+  - path: patches/patch-webeid.yaml
+  - path: patches/patch-votesorder.yaml
+  - path: patches/patch-xroad-service.yaml
+  - path: patches/patch-collector-admin.yaml
+  - path: patches/patch-etcd.yaml
+  - path: patches/patch-proxy-service.yaml
+images:
+  - name: ivxv/proxy
+    newName: ACCOUNT.dkr.ecr.REGION.amazonaws.com/ivxv/proxy
+    newTag: latest
+  - name: ivxv/choices
+    newName: ACCOUNT.dkr.ecr.REGION.amazonaws.com/ivxv/choices
+    newTag: latest
+  - name: ivxv/voting
+    newName: ACCOUNT.dkr.ecr.REGION.amazonaws.com/ivxv/voting
+    newTag: latest
+  - name: ivxv/verification
+    newName: ACCOUNT.dkr.ecr.REGION.amazonaws.com/ivxv/verification
+    newTag: latest
+  - name: ivxv/storage
+    newName: ACCOUNT.dkr.ecr.REGION.amazonaws.com/ivxv/storage
+    newTag: latest
+  - name: ivxv/sessionstatus
+    newName: ACCOUNT.dkr.ecr.REGION.amazonaws.com/ivxv/sessionstatus
+    newTag: latest
+  - name: ivxv/mid
+    newName: ACCOUNT.dkr.ecr.REGION.amazonaws.com/ivxv/mid
+    newTag: latest
+  - name: ivxv/smartid
+    newName: ACCOUNT.dkr.ecr.REGION.amazonaws.com/ivxv/smartid
+    newTag: latest
+  - name: ivxv/webeid
+    newName: ACCOUNT.dkr.ecr.REGION.amazonaws.com/ivxv/webeid
+    newTag: latest
+  - name: ivxv/votesorder
+    newName: ACCOUNT.dkr.ecr.REGION.amazonaws.com/ivxv/votesorder
+    newTag: latest
+  - name: ivxv/xroad-service
+    newName: ACCOUNT.dkr.ecr.REGION.amazonaws.com/ivxv/xroad-service
+    newTag: latest
+  - name: ivxv/collector-admin
+    newName: ACCOUNT.dkr.ecr.REGION.amazonaws.com/ivxv/collector-admin
+    newTag: latest

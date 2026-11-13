@@ -1,0 +1,17 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: collector-admin
+  labels:
+    app.kubernetes.io/name: collector-admin
+    app.kubernetes.io/part-of: ivxv
+    app.kubernetes.io/component: collector
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: collector-admin
+  ports:
+    - name: service
+      port: 8080
+      targetPort: service
+      protocol: TCP

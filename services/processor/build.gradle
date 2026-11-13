@@ -1,0 +1,19 @@
+buildscript {
+    ext.base = '../../'
+    apply from: "${base}/common/java/common-buildscript.gradle", to: buildscript
+}
+
+apply from: "${base}/common/java/common-build.gradle"
+apply plugin: 'application'
+
+dependencies {
+    implementation project(":common")
+
+    testImplementation testFixtures(project(":common"))
+}
+
+application {
+	mainClass = "ee.ivxv.processor.Processor"
+	applicationDefaultJvmArgs = ["-Xmx8G"]
+}
+

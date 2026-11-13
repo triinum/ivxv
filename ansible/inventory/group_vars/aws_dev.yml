@@ -1,0 +1,7 @@
+---
+aws_region: "eu-north-1"
+eks_cluster_name: "ivxv-dev"
+# Replace with: terraform -chdir=../../terraform/envs/aws-dev output -raw ecr_registry
+ecr_registry: "ACCOUNT.dkr.ecr.eu-north-1.amazonaws.com"
+image_tag: "dev"
+kustomize_overlay: "{{ repo_root }}/k8s/overlays/aws"

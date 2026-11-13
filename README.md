@@ -11,3 +11,39 @@ legislation, the actual development of Estonian I-voting system and I-vote
 verification application is supervised by State Electoral Office of Estonia.
 Please refer to www.valimised.ee for further information.
 
+Microservices
+-------------
+
+Deployable units live under ``services/<name>/``. Each service directory
+contains its own source **and** ``Dockerfile``. See ``SERVICES.md`` and
+``services/README.md`` (Dockerfile structure).
+
+Build a single service image (from the repository root)::
+
+        docker build -f services/voting/Dockerfile -t ivxv/voting .
+
+Build all service images::
+
+        make docker
+
+Or use Compose for local wiring (configuration under ``./config``)::
+
+        docker compose build
+
+Kubernetes (Kustomize base + overlays)::
+
+        kubectl apply -k k8s/overlays/dev
+        kubectl apply -k k8s/overlays/aws
+
+AWS (ECR + EKS, public LB only in front of proxy): see ``k8s/AWS.md``.
+Also ``k8s/README.md``.
+
+Infrastructure / ops skeletons::
+
+        terraform/   # VPC, ECR, EKS (apply first)
+        ansible/     # docker build/push + kubectl apply -k
+
+Team architecture explanations (Markdown-only tree, separate branch)::
+
+        ARCHITECTURE-DOCS.md
+        # branch cursor/ivxv-architecture-docs-625e — same folders, docs only

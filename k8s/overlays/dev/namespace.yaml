@@ -1,0 +1,7 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: ivxv-dev
+  labels:
+    app.kubernetes.io/part-of: ivxv
+    environment: dev

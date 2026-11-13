@@ -1,21 +1,21 @@
 #!/usr/bin/dh-exec
 
 # config file for admin utils
-collector-admin/ivxv-collector-admin.conf etc/ivxv/
+services/collector-admin/ivxv-collector-admin.conf etc/ivxv/
 
 # IVXV admin interface
-collector-admin/site/index.html      var/www/collector-admin/
-collector-admin/site/favicon.ico     var/www/collector-admin/
-collector-admin/site/ivxv            var/www/collector-admin/
+services/collector-admin/site/index.html      var/www/collector-admin/
+services/collector-admin/site/favicon.ico     var/www/collector-admin/
+services/collector-admin/site/ivxv            var/www/collector-admin/
 # WSGI application
-collector-admin/site/cgi             var/www/
+services/collector-admin/site/cgi             var/www/
 # IVXV admin JavaScript
-collector-admin/site/js              var/www/collector-admin/
+services/collector-admin/site/js              var/www/collector-admin/
 
 # Apache config file
-collector-admin/config/ivxv-admin-ui.conf etc/apache2/sites-available/
+services/collector-admin/config/ivxv-admin-ui.conf etc/apache2/sites-available/
 # Rsyslog config file
-collector-admin/config/rsyslog.conf => etc/rsyslog.d/90-ivxv-admin.conf
+services/collector-admin/config/rsyslog.conf => etc/rsyslog.d/90-ivxv-admin.conf
 
 # "SB Admin 2" theme
 common/external/js/startbootstrap-sb-admin-2/dist   var/www/collector-admin/

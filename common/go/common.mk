@@ -1,6 +1,7 @@
 # Common Makefile for all Go modules
 # 1. Create new Makefile in a Go module directory
-# 2. Write as first line in a Makefile `include ../common/go/common.mk`
+# 2. Write as first line in a Makefile `include ../../common/go/common.mk`
+#    (from a service under services/<name>/)
 
 COMMONDIR := $(dir $(abspath $(lastword $(MAKEFILE_LIST))))
 ROOTDIR   := $(abspath $(COMMONDIR)../../)/

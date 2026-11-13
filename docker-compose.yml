@@ -1,0 +1,172 @@
+# Local IVXV collector microservice stack.
+#
+# Each service lives under services/<name>/ with a co-located Dockerfile.
+#
+# Build images:
+#   docker compose build
+#
+# Services expect IVXV configuration containers under ./config mounted at
+# /etc/ivxv. Without that configuration the processes exit after config checks.
+
+services:
+  etcd:
+    image: gcr.io/etcd-development/etcd:v3.5.17
+    command:
+      - /usr/local/bin/etcd
+      - --advertise-client-urls=http://etcd:2379
+      - --listen-client-urls=http://0.0.0.0:2379
+    ports:
+      - "2379:2379"
+
+  storage:
+    build:
+      context: .
+      dockerfile: services/storage/Dockerfile
+    image: ivxv/storage
+    volumes:
+      - ./config:/etc/ivxv:ro
+    depends_on:
+      - etcd
+
+  sessionstatus:
+    build:
+      context: .
+      dockerfile: services/sessionstatus/Dockerfile
+    image: ivxv/sessionstatus
+    volumes:
+      - ./config:/etc/ivxv:ro
+
+  choices:
+    build:
+      context: .
+      dockerfile: services/choices/Dockerfile
+    image: ivxv/choices
+    volumes:
+      - ./config:/etc/ivxv:ro
+    depends_on:
+      - storage
+      - sessionstatus
+
+  voting:
+    build:
+      context: .
+      dockerfile: services/voting/Dockerfile
+    image: ivxv/voting
+    volumes:
+      - ./config:/etc/ivxv:ro
+    depends_on:
+      - storage
+      - sessionstatus
+
+  verification:
+    build:
+      context: .
+      dockerfile: services/verification/Dockerfile
+    image: ivxv/verification
+    volumes:
+      - ./config:/etc/ivxv:ro
+    depends_on:
+      - storage
+      - sessionstatus
+
+  mid:
+    build:
+      context: .
+      dockerfile: services/mid/Dockerfile
+    image: ivxv/mid
+    volumes:
+      - ./config:/etc/ivxv:ro
+    depends_on:
+      - sessionstatus
+
+  smartid:
+    build:
+      context: .
+      dockerfile: services/smartid/Dockerfile
+    image: ivxv/smartid
+    volumes:
+      - ./config:/etc/ivxv:ro
+    depends_on:
+      - sessionstatus
+
+  webeid:
+    build:
+      context: .
+      dockerfile: services/webeid/Dockerfile
+    image: ivxv/webeid
+    volumes:
+      - ./config:/etc/ivxv:ro
+    depends_on:
+      - sessionstatus
+
+  votesorder:
+    build:
+      context: .
+      dockerfile: services/votesorder/Dockerfile
+    image: ivxv/votesorder
+    volumes:
+      - ./config:/etc/ivxv:ro
+    depends_on:
+      - storage
+
+  proxy:
+    build:
+      context: .
+      dockerfile: services/proxy/Dockerfile
+    image: ivxv/proxy
+    ports:
+      - "443:443"
+    volumes:
+      - ./config:/etc/ivxv:ro
+    depends_on:
+      - choices
+      - voting
+      - verification
+      - mid
+      - smartid
+      - webeid
+
+  xroad-service:
+    build:
+      context: .
+      dockerfile: services/xroad-service/Dockerfile
+    image: ivxv/xroad-service
+    ports:
+      - "8081:8080"
+    depends_on:
+      - votesorder
+
+  collector-admin:
+    build:
+      context: .
+      dockerfile: services/collector-admin/Dockerfile
+    image: ivxv/collector-admin
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./config:/etc/ivxv
+      - admin-data:/var/lib/ivxv
+
+  key:
+    build:
+      context: .
+      dockerfile: services/key/Dockerfile
+    image: ivxv/key
+    profiles: ["offline"]
+
+  processor:
+    build:
+      context: .
+      dockerfile: services/processor/Dockerfile
+    image: ivxv/processor
+    profiles: ["offline"]
+
+  auditor:
+    build:
+      context: .
+      dockerfile: services/auditor/Dockerfile
+    image: ivxv/auditor
+    profiles: ["offline"]
+
+volumes:
+  admin-data:

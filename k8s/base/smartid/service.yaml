@@ -1,0 +1,17 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: smartid
+  labels:
+    app.kubernetes.io/name: smartid
+    app.kubernetes.io/part-of: ivxv
+    app.kubernetes.io/component: collector
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: smartid
+  ports:
+    - name: service
+      port: 443
+      targetPort: service
+      protocol: TCP

@@ -1,0 +1,8 @@
+---
+ecr_registry: "ACCOUNT.dkr.ecr.REGION.amazonaws.com"
+aws_region: "eu-north-1"
+image_tag: "latest"
+repo_root: "{{ playbook_dir }}/../.."
+ivxv_services: []
+kustomize_overlay: "{{ repo_root }}/k8s/overlays/aws"
+ecr_set_kustomize_images: true

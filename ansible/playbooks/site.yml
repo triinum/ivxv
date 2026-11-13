@@ -1,0 +1,10 @@
+---
+# Full ops path after Terraform has created ECR + EKS:
+#   1) docker build + ECR push (+ optional kustomize image edit)
+#   2) kubectl apply -k k8s/overlays/aws
+- name: Build, push, and deploy IVXV to AWS
+  hosts: localhost
+  gather_facts: false
+  roles:
+    - role: ecr_push
+    - role: k8s_apply

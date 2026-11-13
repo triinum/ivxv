@@ -1,0 +1,6 @@
+---
+aws_region: "eu-north-1"
+eks_cluster_name: "ivxv-dev"
+kustomize_overlay: "{{ playbook_dir }}/../../k8s/overlays/aws"
+update_kubeconfig: true
+k8s_dry_run: false

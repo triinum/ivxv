@@ -1,0 +1,32 @@
+---
+# Shared defaults. Override per env in aws_dev.yml / aws_prod.yml
+# or via -e on the command line.
+
+repo_root: "{{ playbook_dir }}/../.."
+
+ivxv_services:
+  - proxy
+  - choices
+  - voting
+  - verification
+  - storage
+  - sessionstatus
+  - mid
+  - smartid
+  - webeid
+  - votesorder
+  - xroad-service
+  - collector-admin
+
+# Filled from Terraform output `ecr_registry`, e.g.
+# 123456789012.dkr.ecr.eu-north-1.amazonaws.com
+ecr_registry: "ACCOUNT.dkr.ecr.REGION.amazonaws.com"
+
+aws_region: "eu-north-1"
+eks_cluster_name: "ivxv-dev"
+
+# Prefer git SHA in CI: -e image_tag=$(git rev-parse --short HEAD)
+image_tag: "latest"
+
+kustomize_overlay: "{{ repo_root }}/k8s/overlays/aws"
+update_kubeconfig: true

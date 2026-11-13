@@ -1,0 +1,5 @@
+region          = "eu-north-1"
+name_prefix     = "ivxv"
+vpc_cidr        = "10.50.0.0/16"
+azs             = ["eu-north-1a", "eu-north-1b", "eu-north-1c"]
+cluster_version = "1.29"
