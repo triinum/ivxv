@@ -1,53 +1,99 @@
-# IVXV arhitektuuri selgitused (meeskonnale)
+# IVXV arhitektuur — selgitused meeskonnale
 
-See **ei ole** tootmise lähtekood. See on **selgituste repo**: sama kaustastruktuur
-mis mikroteenuste lahenduses (`services/`, `k8s/`, `terraform/`, `ansible/`, …),
-aga iga tee juures on **ainult tekst**, mis kirjeldab rolli, sõltuvusi ja
-otsuseid.
+See repo **ei sisalda lähtekoodi**. Siin on sama kaustapuu mis koodilahenduses,
+aga iga kausta juures on lühike selgitus: mis see on ja miks see olemas on.
 
-**Lähtekood ja Dockerfailid:** [triinum/ivxv](https://github.com/triinum/ivxv)
-(haru `cursor/microservices-dockerfiles-625e`, PR #1).
+Kood ja Dockerfailid: [triinum/ivxv](https://github.com/triinum/ivxv)
+(haru `cursor/microservices-dockerfiles-625e`).
 
-## Kellele
-
-Meeskonnaliikmed, kes peavad mõistma **kogu arhitektuuri** ilma koodi
-läbi lugemata: arendajad, DevOps, QA, tooteomanikud.
-
-## Kuidas lugeda (soovituslik järjekord)
-
-1. [`arhitektuur/ylevaade.md`](arhitektuur/ylevaade.md) — suur pilt
-2. [`arhitektuur/andmevoog.md`](arhitektuur/andmevoog.md) — klient → proxy → teenused
-3. [`SERVICES.md`](SERVICES.md) — teenuste kaart
-4. [`services/`](services/) — iga teenuse üksikleht
-5. [`k8s/`](k8s/) — Kubernetes / Kustomize
-6. [`arhitektuur/aws.md`](arhitektuur/aws.md) — ECR + EKS + NLB (Ingress **ei** ole AWS-is vaja)
-7. [`terraform/`](terraform/) ja [`ansible/`](ansible/) — infra vs ops
-8. [`arhitektuur/terraform-vs-ansible.md`](arhitektuur/terraform-vs-ansible.md)
-
-## Kaustapuu (sama mis koodirepos)
+## Suur pilt
 
 ```text
-services/     # mikroteenused + offline tööriistad (selgitused)
-common/       # jagatud teegid
-core/         # krüpto
-docker/       # build helper’id (mitte teenuste Dockerfile’id)
-k8s/          # Kustomize base + overlays
-terraform/    # AWS infra skelett
-ansible/      # build/push/apply
-arhitektuur/  # läbilõiked (voog, AWS, TF vs Ansible)
+Internet → NLB / Ingress → proxy (:443)
+                              │
+              ┌───────────────┼───────────────┐
+              ▼               ▼               ▼
+           voting         choices      verification …
+              │               │               │
+              └───────┬───────┴───────┬───────┘
+                      ▼               ▼
+                sessionstatus      storage → etcd
 ```
 
-## Olulised põhimõtted (lühidalt)
+- **proxy** on ainus avalik sissepääs (SNI/TLS).
+- Ülejäänud teenused on klastris privaatsed (`ClusterIP`).
+- AWS-is **Ingressit ei ole vaja** — NLB → proxy.
+- Terraform loob infra (VPC/ECR/EKS); Ansible ehitab/pushib/rakendab.
 
-| Põhimõte | Tähendus |
-|----------|----------|
-| Üks kaust = üks teenus | `services/<nimi>/` sisaldab koodis ka Dockerfile’i |
-| Proxy on ainus avalik uks | Internet → NLB/Ingress → **ainult proxy**; ülejäänud ClusterIP |
-| AWS-is pole Ingressit vaja | `LoadBalancer` (NLB) + TLS passthrough proxy peale |
-| Terraform ≠ Ansible | TF = VPC/ECR/EKS; Ansible = docker build/push + kubectl apply |
-| Offline ≠ online | `key` / `processor` / `auditor` ei jookse pidevalt EKS-is |
+## Kaustapuu
 
-## Seotud
+```text
+.
+├── README.md                 ← sa oled siin
+├── SERVICES.md               ← teenuste tabel (roll + port)
+├── SOURCE.md                 ← seos koodirepoga
+│
+├── arhitektuur/              ← läbilõiked
+│   ├── ylevaade.md           ← suur pilt
+│   ├── andmevoog.md          ← klient → proxy → teenused
+│   ├── aws.md                ← ECR + EKS + NLB
+│   └── terraform-vs-ansible.md
+│
+├── services/                 ← üks kaust = üks teenus (selgitus)
+│   ├── proxy/
+│   ├── choices/
+│   ├── voting/
+│   ├── verification/
+│   ├── storage/
+│   ├── sessionstatus/
+│   ├── mid/
+│   ├── smartid/
+│   ├── webeid/
+│   ├── votesorder/
+│   ├── xroad-service/
+│   ├── collector-admin/
+│   ├── key/                  ← offline (Java)
+│   ├── processor/            ← offline
+│   └── auditor/              ← offline
+│
+├── common/                   ← jagatud teegid (ei ole teenus)
+├── core/                     ← krüpto (ei ole teenus)
+├── docker/                   ← build helper’id (Dockerfile’id on services/ all)
+│
+├── k8s/
+│   ├── AWS.md
+│   ├── base/                 ← Deployment + Service iga teenuse jaoks
+│   │   ├── proxy/
+│   │   ├── …                 ← sama nimekiri mis services/
+│   │   ├── etcd/
+│   │   └── config/           ← Secret’id (/etc/ivxv)
+│   └── overlays/
+│       ├── dev/              ← 1 replica, ilma avaliku sissepääsuta
+│       ├── staging/          ← Ingress
+│       ├── prod/             ← Ingress + HA
+│       └── aws/              ← ECR; NLB → ainult proxy
+│
+├── terraform/
+│   ├── modules/
+│   │   ├── network/          ← VPC (skelett)
+│   │   ├── ecr/              ← tõmmiste repositooriumid
+│   │   └── eks/              ← klaster (skelett)
+│   └── envs/
+│       ├── aws-dev/
+│       └── aws-prod/
+│
+└── ansible/
+    ├── playbooks/            ← site / build-push / apply
+    ├── roles/
+    │   ├── ecr_push/         ← docker build + ECR push
+    │   └── k8s_apply/        ← kubectl apply -k
+    └── inventory/            ← aws_dev / aws_prod muutujad
+```
 
-- Kood: `https://github.com/triinum/ivxv`
-- AWS juhend koodirepos: `k8s/AWS.md`
+## Kuidas lugeda
+
+1. See README + [`SERVICES.md`](SERVICES.md)
+2. [`arhitektuur/ylevaade.md`](arhitektuur/ylevaade.md) ja [`andmevoog.md`](arhitektuur/andmevoog.md)
+3. Vajadusel üksik teenus: `services/<nimi>/README.md`
+4. Kubernetes / AWS: `k8s/` ja [`arhitektuur/aws.md`](arhitektuur/aws.md)
+5. Infra vs ops: [`arhitektuur/terraform-vs-ansible.md`](arhitektuur/terraform-vs-ansible.md)
