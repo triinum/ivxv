@@ -42,3 +42,8 @@ Infrastructure / ops skeletons::
 
         terraform/   # VPC, ECR, EKS (apply first)
         ansible/     # docker build/push + kubectl apply -k
+
+Team architecture explanations (Markdown-only tree, separate branch)::
+
+        ARCHITECTURE-DOCS.md
+        # branch cursor/ivxv-architecture-docs-625e — same folders, docs only
