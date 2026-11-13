@@ -37,3 +37,8 @@ Kubernetes (Kustomize base + overlays)::
 
 AWS (ECR + EKS, public LB only in front of proxy): see ``k8s/AWS.md``.
 Also ``k8s/README.md``.
+
+Infrastructure / ops skeletons::
+
+        terraform/   # VPC, ECR, EKS (apply first)
+        ansible/     # docker build/push + kubectl apply -k

@@ -63,13 +63,33 @@ bastioni või `kubectl port-forward` kaudu, mitte avaliku URL-iga.
 
 ---
 
+## Terraform + Ansible (soovituslik skelett)
+
+Käsitsi sammud allpool jäävad kehtima. Samas repos on ka **skeletid**:
+
+| Tööriist | Kaust | Roll |
+|----------|-------|------|
+| **Terraform** | `terraform/` | VPC, ECR repositooriumid, EKS (infra) |
+| **Ansible** | `ansible/` | `docker build` / ECR push / `kubectl apply -k` (ops) |
+
+```text
+cd terraform/envs/aws-dev && terraform apply   # ECR + EKS
+cd ansible && ansible-playbook playbooks/site.yml -e @inventory/group_vars/aws_dev.yml
+```
+
+Täpsemalt: `terraform/README.md`, `ansible/README.md`.
+`modules/eks` ja `modules/network` on teadlikult pooleli — asenda tootmise
+moodulitega enne päris `apply`-d. `modules/ecr` on kasutatav peaaegu kohe.
+
+---
+
 ## Eeldused
 
 Enne alustamist oleks vaja:
 
 - AWS konto, õigused ECR / EKS / VPC / ELB peale
 - Kohalikud tööriistad: `docker`, `aws` CLI, `kubectl` (soovituslikult ka
-  `eksctl` või Terraform klastri loomiseks)
+  `eksctl` või Terraform klastri loomiseks; vt `terraform/` skelett)
 - Repo juurkaustas töötamine (Dockerfile’ide `COPY` teed eeldavad seda)
 - IVXV seadistusmaterjal (trust / election / technical jms), mida hiljem
   Secret’ina klastrisse panna
@@ -281,6 +301,8 @@ Neid ei pea EKS-is kogu aeg jooksma. Vajadusel:
 | `k8s/README.md` | Kustomize base / overlay ülevaade |
 | `k8s/base/<teenus>/` | Deployment + Service baas |
 | `k8s/overlays/aws/` | AWS-spetsiifiline overlay (ECR + proxy NLB) |
+| `terraform/` | AWS infra skelett (VPC / ECR / EKS) |
+| `ansible/` | Build/push/apply playbook’id |
 | `docker-compose.yml` | Kohalik (mitte-AWS) jooks |
 
 Küsimuste korral: alusta alati `kubectl kustomize k8s/overlays/aws`

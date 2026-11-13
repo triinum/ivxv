@@ -1,0 +1,49 @@
+---
+- name: Require ecr_registry to be set (not placeholder)
+  ansible.builtin.assert:
+    that:
+      - ecr_registry is defined
+      - ecr_registry | length > 0
+      - "'ACCOUNT' not in ecr_registry"
+    fail_msg: >-
+      Set ecr_registry to the Terraform output (e.g. from
+      terraform -chdir=terraform/envs/aws-dev output -raw ecr_registry).
+
+- name: Log in to Amazon ECR
+  ansible.builtin.shell: |
+    set -euo pipefail
+    aws ecr get-login-password --region "{{ aws_region }}" \
+      | docker login --username AWS --password-stdin "{{ ecr_registry }}"
+  args:
+    executable: /bin/bash
+  changed_when: false
+
+- name: Build and push each IVXV service image
+  ansible.builtin.shell: |
+    set -euo pipefail
+    docker build \
+      -f "{{ repo_root }}/services/{{ item }}/Dockerfile" \
+      -t "ivxv/{{ item }}:{{ image_tag }}" \
+      "{{ repo_root }}"
+    docker tag \
+      "ivxv/{{ item }}:{{ image_tag }}" \
+      "{{ ecr_registry }}/ivxv/{{ item }}:{{ image_tag }}"
+    docker push "{{ ecr_registry }}/ivxv/{{ item }}:{{ image_tag }}"
+  args:
+    executable: /bin/bash
+  loop: "{{ ivxv_services }}"
+  loop_control:
+    label: "{{ item }}"
+
+- name: Point Kustomize aws overlay images at ECR tags
+  ansible.builtin.shell: |
+    set -euo pipefail
+    cd "{{ kustomize_overlay }}"
+    kustomize edit set image \
+      "ivxv/{{ item }}={{ ecr_registry }}/ivxv/{{ item }}:{{ image_tag }}"
+  args:
+    executable: /bin/bash
+  loop: "{{ ivxv_services }}"
+  loop_control:
+    label: "{{ item }}"
+  when: ecr_set_kustomize_images | bool

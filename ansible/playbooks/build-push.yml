@@ -1,0 +1,6 @@
+---
+- name: Build IVXV images and push to ECR
+  hosts: localhost
+  gather_facts: false
+  roles:
+    - role: ecr_push

@@ -1,0 +1,6 @@
+---
+- name: Apply IVXV Kustomize overlay to EKS
+  hosts: localhost
+  gather_facts: false
+  roles:
+    - role: k8s_apply

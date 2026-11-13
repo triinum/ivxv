@@ -1,0 +1,62 @@
+---
+- name: Update kubeconfig for EKS cluster
+  ansible.builtin.command:
+    argv:
+      - aws
+      - eks
+      - update-kubeconfig
+      - --region
+      - "{{ aws_region }}"
+      - --name
+      - "{{ eks_cluster_name }}"
+  when: update_kubeconfig | bool
+  changed_when: false
+
+- name: Preview Kustomize overlay (dry-run)
+  ansible.builtin.command:
+    argv:
+      - kubectl
+      - kustomize
+      - "{{ kustomize_overlay }}"
+  register: kustomize_preview
+  changed_when: false
+  when: k8s_dry_run | bool
+
+- name: Show dry-run preview
+  ansible.builtin.debug:
+    var: kustomize_preview.stdout_lines
+  when: k8s_dry_run | bool
+
+- name: Apply Kustomize overlay to the cluster
+  ansible.builtin.command:
+    argv:
+      - kubectl
+      - apply
+      - -k
+      - "{{ kustomize_overlay }}"
+  register: k8s_apply_result
+  when: not (k8s_dry_run | bool)
+  changed_when: >-
+    'configured' in k8s_apply_result.stdout
+    or 'created' in k8s_apply_result.stdout
+
+- name: Show cluster services after apply
+  ansible.builtin.command:
+    argv:
+      - kubectl
+      - get
+      - pods,svc
+      - -A
+      - -l
+      - app.kubernetes.io/part-of=ivxv
+  register: k8s_status
+  changed_when: false
+  failed_when: false
+  when: not (k8s_dry_run | bool)
+
+- name: Cluster status
+  ansible.builtin.debug:
+    var: k8s_status.stdout_lines
+  when:
+    - not (k8s_dry_run | bool)
+    - k8s_status is defined
