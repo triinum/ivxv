@@ -18,6 +18,44 @@ See järjekord on teadlik: kõigepealt on olemas käivitatavad tõmmised (ECR),
 siis koht kus neid jooksutada (EKS), siis võrgureegel et internet ei näeks
 midagi peale proxy.
 
+---
+
+## EKS klaster AWS-is — kirjeldus (1–4)
+
+Üks EKS klaster keskkonna kohta. Seal pod’id teenuste kaupa; andmed RDS-is;
+internet näeb ainult NLB → proxy.
+
+### 1. Pod’id klastris
+
+- Üks klaster, namespace nt `ivxv-aws` (`k8s/overlays/aws`).
+- Iga mikroteenus = **Deployment** → sellest tekivad **pod’id**
+  (`proxy`, `voting`, `choices`, …).
+- Peale proxy on teenused **ClusterIP** (ainult klastri / VPC sees).
+- `replicas` määrab pod’ide arvu; offline tööriistad (`key` / `processor` /
+  `auditor`) ei ole püsivad pod’id.
+
+### 2. etcd asendus
+
+- etcd asemel **Amazon RDS PostgreSQL** (`storage.protocol: postgres`).
+- PutGetter liides jääb samaks; URI technical configis (või Secret /
+  `IVXV_POSTGRES_URI`).
+- Aws overlay **ei** käivita in-cluster Postgresit ega etcd’t — DB on
+  hallatud teenus privaatses alamvõrgus.
+- `storage` teenus Postgresi režiimis ainult ühenduse / skeemi kontrolliks.
+
+### 3. Proxy
+
+- Ainus rakendustaseme sisenemispunkt.
+- Klient TLS + SNI → proxy valib backend’i (`voting`, `choices`, …).
+- Liiklus klastrisiseselt ClusterIP nimedele; hääletusrajal TLS passthrough.
+
+### 4. Avalik koormusjaotur
+
+- **NLB** TCP **:443** → ainult `proxy` (`Service type: LoadBalancer`).
+- DNS → NLB hostname.
+- **Ingressit / ALB-d ei ole vaja** (SNI/TLS mudel).
+- Admin ja teised teenused ilma avaliku LB-ta (VPN / bastion / port-forward).
+
 ## Miks just nii?
 
 IVXV kogumisteenus on juba disainitud mikroteenustena. **Proxy** on ainus
