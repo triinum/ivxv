@@ -4,29 +4,50 @@
 kõik online-mikroteenused pod’idena. Andmebaas (Postgres) on klastrist
 **väljas** (RDS), samas VPC-s.
 
+## Joonis (repo → ECR/EKS → liiklus)
+
 ```text
-Internet
-   │
-   ▼
-4. Avalik koormusjaotur (NLB :443)
-   │
-   ▼
-3. proxy (EKS pod) — SNI / TLS edasi
-   │
-   ├─► voting, choices, verification, …
-   ├─► mid / smartid / webeid
-   └─► sessionstatus, …
-          │
-          ▼
-2. etcd asendus → RDS PostgreSQL (PutGetter)
+REPO
+├── services/<teenus>/Dockerfile     ──build/push──►  ECR  ivxv/<teenus>:<tag>
+│      proxy, voting, choices, …
+│
+└── k8s/
+    ├── base/<teenus>/               Deployment + Service (pod’i kirjeldus)
+    └── overlays/aws/                ECR image’id, replicas, NLB→proxy
+              │
+              │  kubectl apply -k
+              ▼
+         EKS klaster (namespace ivxv-aws)
+              │
+Internet      │
+   │          │
+   ▼          │
+4. NLB :443 ──┼──► 3. proxy pod(id)     ← LoadBalancer Service
+              │         │ SNI
+              │         ├─► voting / choices / verification / …  (ClusterIP)
+              │         ├─► mid / smartid / webeid
+              │         └─► sessionstatus / …
+              │                    │
+              │                    ▼
+              │         2. RDS PostgreSQL   ← etcd asendus (PutGetter)
+              │
+              └── 1. iga teenus = Deployment → pod’id
+                   (image tuleb ECR-ist; spek tuleb k8s manifestidest)
 ```
+
+| Repo fail | Mis roll |
+|-----------|----------|
+| `services/<nimi>/Dockerfile` | Ehitab tõmmise → ECR |
+| `k8s/base/<nimi>/` | Deployment + Service baas |
+| `k8s/overlays/aws/` | AWS: image tag’id, NLB ainult proxy’l, RDS (mitte in-cluster DB) |
 
 ---
 
 ## 1. Pod’id klastris
 
 - Üks EKS klaster, üks namespace (nt `ivxv-aws`).
-- Iga mikroteenus = üks **Deployment** → sellest tekivad **pod’id**.
+- Iga mikroteenus = üks **Deployment** (`k8s/base/<teenus>/deployment.yaml`)
+  → sellest tekivad **pod’id**; image = ECR tõmmis Dockerfile’ist.
 - Näited: `proxy`, `voting`, `choices`, `verification`, `storage`,
   `sessionstatus`, `mid`, `smartid`, `webeid`, `votesorder`,
   `xroad-service`, `collector-admin`.
@@ -49,17 +70,17 @@ Internet
 ## 3. Proxy
 
 - **proxy** on IVXV ainus loogiline sisenemispunkt.
+- Dockerfile: `services/proxy/Dockerfile` → image `ivxv/proxy`.
+- Manifest: `k8s/base/proxy/` + aws patch teeb Service’ist `LoadBalancer`.
 - Klient avab TLS-i; SNI ütleb, millist teenust tahta (`voting`, `choices`, …).
 - Proxy edastab liikluse klastrisiseselt õigele ClusterIP teenusele
   (**TLS passthrough** — NLB/proxy ei lõpeta hääletusraja TLS-i HTTP-na).
-- Ilma proxyta ei tohiks ükski teine collector-teenus olla internetist
-  otse kättesaadav.
 
 ## 4. Avalik koormusjaotur
 
 - AWS **Network Load Balancer (NLB)**, TCP port **443**.
 - Tekib, kui `proxy` Service on `type: LoadBalancer` (+ NLB annotatsioonid)
-  overlay’s `k8s/overlays/aws`.
+  overlay’s `k8s/overlays/aws` (nt `patches/patch-proxy-service.yaml`).
 - NLB → **ainult proxy** pod’idele.
 - DNS (Route 53) osutab NLB hostname’ile.
 - **Ingressit / ALB-d AWS teel ei ole vaja** (need segaksid SNI/TLS mudelit).
@@ -72,6 +93,8 @@ Internet
 
 | # | Osa | Mis see on |
 |---|-----|------------|
+| — | Dockerfile | `services/<nimi>/Dockerfile` → ECR image |
+| — | Manifestid | `k8s/base` + `overlays/aws` → Deployment/Service → pod’id |
 | 1 | Pod’id | Üks EKS; teenus = Deployment → pod’id; peale proxy kõik ClusterIP |
 | 2 | etcd → Postgres | RDS + `protocol: postgres`; etcd aws peal ei kasutata |
 | 3 | Proxy | Ainus app-taseme uks; SNI → backend |
