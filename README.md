@@ -12,6 +12,7 @@
 │   ├── ylevaade.md           ← suur pilt
 │   ├── andmevoog.md          ← klient → proxy → teenused
 │   ├── aws.md                ← ECR + EKS + NLB
+│   ├── eks-klaster.md        ← EKS kirjeldus: pod’id, Postgres, proxy, NLB
 │   └── terraform-vs-ansible.md
 │
 ├── services/                 ← üks kaust = üks teenus (+ oma Dockerfile)

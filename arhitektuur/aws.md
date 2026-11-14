@@ -22,3 +22,12 @@ Staging/prod overlay’des on Ingress **alternatiiv** keskkondadele ilma pilve-N
 - Ansible teeb `docker build` / push / `kubectl apply -k`.
 
 Vt `terraform/README.md`, `ansible/README.md`, `arhitektuur/terraform-vs-ansible.md`.
+
+## EKS klaster sammude kaupa
+
+Täielik nummerdatud kirjeldus: [`eks-klaster.md`](eks-klaster.md)
+
+1. Pod’id klastris  
+2. etcd → PostgreSQL (RDS)  
+3. Proxy  
+4. Avalik koormusjaotur (NLB)  
