@@ -28,11 +28,11 @@ internet näeb ainult NLB → proxy.
 ### 1. Pod’id klastris
 
 - Üks klaster, namespace nt `ivxv-aws` (`k8s/overlays/aws`).
-- Iga mikroteenus = **Deployment** → sellest tekivad **pod’id**
-  (`proxy`, `voting`, `choices`, …).
+- Iga mikroteenus = **Dockerfile** (`services/<nimi>/`) → ECR image +
+  **Deployment** (`k8s/base/<nimi>/`) → **pod’id**.
 - Peale proxy on teenused **ClusterIP** (ainult klastri / VPC sees).
-- `replicas` määrab pod’ide arvu; offline tööriistad (`key` / `processor` /
-  `auditor`) ei ole püsivad pod’id.
+- `replicas` / image tag’id tulevad overlay’st `aws`; offline tööriistad
+  (`key` / `processor` / `auditor`) ei ole püsivad pod’id.
 
 ### 2. etcd asendus
 
@@ -72,26 +72,32 @@ Seega AWS-is:
 | **ClusterIP teenused** | Ülejäänud mikroteenused — ainult klastri / VPC sees |
 
 ```text
-                    Internet (valija / kontrollrakendus)
-                              │
-                              ▼
-                 ┌─────────────────────────┐
-                 │  AWS NLB  (TCP :443)    │  ← avalik koormusjaotur
-                 └────────────┬────────────┘
-                              │
-                              ▼
-                 ┌─────────────────────────┐
-                 │  proxy  (EKS pod)       │  ← SNI põhjal edasi
-                 └────────────┬────────────┘
-          ┌───────────┬───────┴────────┬────────────┐
-          ▼           ▼                ▼            ▼
-      choices      voting        verification      mid / …
-          │           │                │
-          └───────────┴───────┬────────┘
-                              ▼
-                    storage / PostgreSQL (RDS) / sessionstatus
-                 (ainult privaatne VPC / ClusterIP;
-                  etcd asemel protocol: postgres)
+REPO
+├── services/<teenus>/Dockerfile  ──build/push──►  ECR  ivxv/<teenus>:<tag>
+│
+└── k8s/base/<teenus>/ + overlays/aws/   ──kubectl apply -k──►  EKS
+         Deployment + Service                    namespace ivxv-aws
+
+Internet (valija / kontrollrakendus)
+         │
+         ▼
+┌─────────────────────────┐
+│ 4. AWS NLB  (TCP :443)  │  ← avalik koormusjaotur
+└────────────┬────────────┘     (proxy Service = LoadBalancer)
+             │
+             ▼
+┌─────────────────────────┐
+│ 3. proxy  (EKS pod)     │  ← image: ECR …/ivxv/proxy
+│    services/proxy/Dockerfile + k8s/base/proxy/
+└────────────┬────────────┘
+     ┌───────┼────────┬────────────┐
+     ▼       ▼        ▼            ▼
+ choices  voting  verification  mid / …     ← ClusterIP pod’id
+     │       │        │            │         (1. iga teenus = Deployment)
+     └───────┴────┬───┴────────────┘
+                  ▼
+        2. RDS PostgreSQL / sessionstatus
+           (etcd asemel protocol: postgres)
 ```
 
 **Ära** pane interneti-koormusjaoturit `voting`, `choices`, `storage` ega
