@@ -69,6 +69,7 @@ jooksuvad operaatori masinas / CI-s, mitte remote SSH peal.
 
 ## Seotud
 
-- `k8s/AWS.md` — käsitsi samm-sammult sama voog
+- `k8s/AWS.md` — käsitsi samm-sammult sama voog; tabelid **Kustomize
+  (base/overlays/kustomization)** ja **Ansible** (playbook’id / rollid vs 4a–4e)
 - `terraform/` — VPC / ECR / EKS skelett
 - `k8s/overlays/aws/` — sihtmärk `k8s_apply` rollile
