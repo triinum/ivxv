@@ -42,6 +42,14 @@ Sama **Dockerfile** ja sama image (soovituslikult git SHA tag) liigub edasi.
 Muutub ainult **kus** jookseb ja **milline overlay** / andmebaas / avalik
 sisenemine.
 
+| Samm | Mis toimub | Kus | Mida teha |
+|------|------------|-----|-----------|
+| **0. Test** | Tõmmised ehituvad Dockerfile’dest; smoke kontrollib, et konteiner käivitub (ECR-i veel ei laeta) | Kohalik masin / CI | `docker build -f services/…/Dockerfile`; soovi korral kind + `overlays/dev` |
+| **1. Dev** | Täis mikroteenuste stack arendusele; andmed in-cluster Postgresis; 1 replica | `k8s/overlays/dev` (`ivxv-dev`) | `kubectl apply -k k8s/overlays/dev`; täida `ivxv-config` Secret |
+| **2. Staging** | Sama SHA prod-lähedases keskkonnas; rohkem replica’sid; liiklus Ingress → proxy | `k8s/overlays/staging` (`ivxv-staging`) | Sea image tag `staging`; Ingress hostid; `kubectl apply -k …`; regressioon |
+| **3. Prod** | HA juurutus on-prem / tavalises K8s-is (Ingress). Kui prod on ainult AWS → hüppa sammule 4 | `k8s/overlays/prod` (`ivxv-prod`) | `kubectl apply -k k8s/overlays/prod`; go-live checklist |
+| **4. AWS** | Sama image ECR-is; pod’id EKS-is; andmed RDS-is; internet näeb ainult NLB → proxy | ECR + EKS + `k8s/overlays/aws` | Terraform → build/push → `set image` → `apply -k overlays/aws` → DNS |
+
 ```text
 Dockerfile (services/*)
         │
@@ -127,13 +135,13 @@ tag).
 Eesmärk: sama image AWS-is; **RDS** (mitte in-cluster PG); avalik ainult
 **NLB → proxy**.
 
-| Samm | Tegevus | Overlay / tööriist |
-|------|---------|-------------------|
-| 4a | VPC + EKS + ECR (+ RDS) | `terraform/` (nt `envs/aws-dev`) |
-| 4b | `docker build` + push ECR (`ivxv/<teenus>:<TAG>`) | Samm 1 allpool |
-| 4c | Sea ECR image’id overlay’s | `kustomize edit set image` `overlays/aws` |
-| 4d | Secretid + `kubectl apply -k k8s/overlays/aws` | namespace `ivxv-aws` |
-| 4e | DNS → NLB; testi SNI läbi proxy | ainult proxy LoadBalancer |
+| Samm | Mis toimub | Kus | Mida teha |
+|------|------------|-----|-----------|
+| 4a | Luuakse võrk, register, klaster ja hallatud Postgres | AWS / `terraform/` (nt `envs/aws-dev`) | `terraform apply` — VPC + ECR + EKS + RDS |
+| 4b | Dockerfile’dest saavad ECR-i tõmmised (sama `TAG`) | Repo juur → ECR | `docker build` + `docker push` `ivxv/<teenus>:<TAG>` |
+| 4c | Overlay viitab ECR aadressidele, mitte kohalikele tag’idele | `k8s/overlays/aws` | `kustomize edit set image …` |
+| 4d | Online-teenused käivituvad EKS-is; in-cluster PG/etcd on välja lülitatud | namespace `ivxv-aws` | Secretid + `kubectl apply -k k8s/overlays/aws` |
+| 4e | Avalik liiklus jõuab ainult proxy’ni; ülejäänu jääb VPC sisse | NLB → `proxy` LoadBalancer | DNS → NLB; SNI smoke test |
 
 AWS-is **eraldi keskkondade** (test/dev/prod) soovitus:
 
