@@ -79,7 +79,6 @@ proxy avalik uks. **Kõik ühes tabelis** (proxy + Kustomize + Ansible kaasas).
 | `aws` | `ivxv-aws` | ECR `…/ivxv/<s>:<TAG>` | **RDS** | **NLB** |
 
 ### 0. Test (kohalik / CI)
-### 0. Test (kohalik / CI)
 
 Eesmärk: tõmmised ehituvad ja teenus käivitub vähemalt konteinerina.
 
