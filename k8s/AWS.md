@@ -44,29 +44,40 @@ sisenemine.
 
 | Samm | Mis toimub | Kus | Mida teha |
 |------|------------|-----|-----------|
-| **0. Test** | Tõmmised ehituvad Dockerfile’dest; smoke kontrollib, et konteiner käivitub (ECR-i veel ei laeta) | Kohalik masin / CI | `docker build -f services/…/Dockerfile`; soovi korral kind + `overlays/dev` |
-| **1. Dev** | Täis mikroteenuste stack arendusele; andmed in-cluster Postgresis; 1 replica | `k8s/overlays/dev` (`ivxv-dev`) | `kubectl apply -k k8s/overlays/dev`; täida `ivxv-config` Secret |
-| **2. Staging** | Sama SHA prod-lähedases keskkonnas; rohkem replica’sid; liiklus Ingress → proxy | `k8s/overlays/staging` (`ivxv-staging`) | Sea image tag `staging`; Ingress hostid; `kubectl apply -k …`; regressioon |
-| **3. Prod** | HA juurutus on-prem / tavalises K8s-is (Ingress). Kui prod on ainult AWS → hüppa sammule 4 | `k8s/overlays/prod` (`ivxv-prod`) | `kubectl apply -k k8s/overlays/prod`; go-live checklist |
-| **4. AWS** | Sama image ECR-is; pod’id EKS-is; andmed RDS-is; internet näeb ainult NLB → proxy | ECR + EKS + `k8s/overlays/aws` | Terraform → build/push → `set image` → `apply -k overlays/aws` → DNS |
+| **0. Test** | Tõmmised ehituvad Dockerfile’dest (sh `proxy`); smoke — ECR-i veel ei laeta. Proxy avalikku ust ei avata | Kohalik masin / CI | `docker build -f services/…/Dockerfile` (sh `services/proxy/`); soovi korral kind + `overlays/dev` |
+| **1. Dev** | Täis stack + **proxy pod** ClusterIP-na (SNI dispatcher klastri sees); andmed in-cluster Postgres; **avalikku Ingressit/NLB-d ei ole** | `k8s/overlays/dev` (`ivxv-dev`) | `kubectl apply -k k8s/overlays/dev`; Secret; proxy test `port-forward` / klastrisiseselt |
+| **2. Staging** | Sama SHA; **Ingress → proxy** (+ eraldi Ingress adminile); rohkem replica’sid | `k8s/overlays/staging` + `ingress.yaml` | Sea image tag; Ingress hostid (proxy + admin); `apply -k`; SNI smoke läbi Ingressi |
+| **3. Prod** | HA; **Ingress → proxy** (+ admin Ingress), nagu staging, rohkem replica’sid. Kui prod on ainult AWS → samm 4 | `k8s/overlays/prod` + `ingress.yaml` | `kubectl apply -k k8s/overlays/prod`; go-live; kontrolli Ingress → proxy |
+| **4. AWS** | Sama image ECR-is; RDS; **avalik ainult NLB → proxy** (Ingressit ei ole; admin privaatne) | ECR + EKS + `overlays/aws` (`patch-proxy-service`) | Terraform → push → `set image` → `apply -k overlays/aws` → DNS → NLB |
+
+**Proxy ei ole ainult prod.** Proxy **teenus/pod** jookseb igas keskkonnas (test/dev
+kaasa arvatud) — see on ainus SNI/TLS sisenemispunkt teiste mikroteenuste
+juurde. Mis **muutub**, on avalik uks:
+
+| Keskkond | Proxy pod? | Avalik sisenemine proxy’le |
+|----------|------------|----------------------------|
+| test / dev | jah (ClusterIP) | ei — `kubectl port-forward` / klastri sees |
+| staging | jah | **Ingress** → `proxy` (+ admin Ingress) |
+| prod (on-prem overlay) | jah | **Ingress** → `proxy` (+ admin Ingress) |
+| AWS | jah | **NLB** → `proxy` ainult (admin ilma avaliku LB-ta) |
 
 ```text
-Dockerfile (services/*)
+Dockerfile (services/*)  sh proxy/
         │
         ▼
-   [0] TEST     — kohalik docker build / smoke
+   [0] TEST     — build/smoke; proxy pole avalik
         │
         ▼
-   [1] DEV      — k8s/overlays/dev      (1 replica, in-cluster Postgres)
+   [1] DEV      — proxy ClusterIP (port-forward)
         │
         ▼
-   [2] STAGING  — k8s/overlays/staging  (rohkem replica’sid + Ingress)
+   [2] STAGING  — Ingress → proxy (+ admin)
         │
         ▼
-   [3] PROD     — k8s/overlays/prod     (HA + Ingress)  VÕI otse AWS
+   [3] PROD     — Ingress → proxy (+ admin)  VÕI otse AWS
         │
         ▼
-   [4] AWS      — ECR + EKS + k8s/overlays/aws  (RDS, NLB→proxy)
+   [4] AWS      — NLB → proxy only (RDS, ECR)
 ```
 
 Reposis **ei ole** eraldi `overlays/test` — test on build + lokaalne / CI
