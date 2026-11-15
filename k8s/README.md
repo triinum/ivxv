@@ -19,6 +19,8 @@ k8s/
 ```
 
 AWS (ECR → EKS → NLB only in front of proxy): see **`AWS.md`**.
+Step-by-step promotion **test → dev → staging → prod → AWS** (Dockerfiles
+through overlays): **`AWS.md`** section *Samm-sammuline plaan*.
 Storage protocol: set `technical.storage.protocol` to `postgres` (default path)
 or `etcd` (legacy). See `common/collector/storage/postgres`.
 

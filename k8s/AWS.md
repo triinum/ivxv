@@ -36,6 +36,127 @@ midagi peale proxy.
 
 ---
 
+## Samm-sammuline plaan: test → dev → staging → prod → AWS
+
+Sama **Dockerfile** ja sama image (soovituslikult git SHA tag) liigub edasi.
+Muutub ainult **kus** jookseb ja **milline overlay** / andmebaas / avalik
+sisenemine.
+
+```text
+Dockerfile (services/*)
+        │
+        ▼
+   [0] TEST     — kohalik docker build / smoke
+        │
+        ▼
+   [1] DEV      — k8s/overlays/dev      (1 replica, in-cluster Postgres)
+        │
+        ▼
+   [2] STAGING  — k8s/overlays/staging  (rohkem replica’sid + Ingress)
+        │
+        ▼
+   [3] PROD     — k8s/overlays/prod     (HA + Ingress)  VÕI otse AWS
+        │
+        ▼
+   [4] AWS      — ECR + EKS + k8s/overlays/aws  (RDS, NLB→proxy)
+```
+
+Reposis **ei ole** eraldi `overlays/test` — test on build + lokaalne / CI
+kontroll enne `dev` peale panekut. `staging` on repos `dev` ja `prod` vahel;
+ära hüppa `dev` → `prod` ilma staginguta, kui meeskond seda nõuab.
+
+### 0. Test (kohalik / CI)
+
+Eesmärk: tõmmised ehituvad ja teenus käivitub vähemalt konteinerina.
+
+1. Repo juurest: `docker build -f services/<nimi>/Dockerfile -t ivxv/<nimi>:test .`
+   või kõik: `make docker` (kui Makefile seda toetab).
+2. Smoke: `docker run --rm …` ühe teenusega + `/etc/ivxv` mount (või vähemalt
+   et binaar / protsess ei kuku kohe).
+3. Soovi korral kind/minikube: `kubectl apply -k k8s/overlays/dev` ja
+   `kubectl -n ivxv-dev get pods`.
+4. Ära push’i ECR-i enne kui build + smoke on OK.
+
+**Läbiminek:** kõik online-teenuste Dockerfiled buildivad; kriitilised pod’id
+(või vähemalt `proxy` + `storage` + üks backend) Ready.
+
+### 1. Dev
+
+Eesmärk: täis stack arenduseks; andmed **in-cluster Postgres** (`base/postgres`).
+
+```bash
+# Image tag overlay’s: tavaliselt :dev (või lae registrisse ja set image)
+kubectl apply -k k8s/overlays/dev
+kubectl -n ivxv-dev get pods,svc
+# Täida Secret ivxv-config (trust / election / technical)
+```
+
+Kontrolli: technical configis `storage.protocol: postgres`; proxy ClusterIP;
+admin mitte avalik.
+
+**Läbiminek:** valija / kontrolli smoke läbi proxy; PutGetter töötab Postgresis.
+
+### 2. Staging
+
+Eesmärk: prod-lähedane (rohkem replica’sid, Ingress), enne päris prod’i.
+
+1. Ehita **sama commit** uuesti (või kasuta sama SHA tag’i).
+2. `kustomize edit set image` / overlay tag → `staging`.
+3. Seadista `overlays/staging/ingress.yaml` hostid.
+4. `kubectl apply -k k8s/overlays/staging`.
+5. Integreeritud testid, TLS/SNI läbi Ingressi → proxy.
+
+**Läbiminek:** staging smoke + regressioon OK; config Secretid staging
+väärtustega.
+
+### 3. Prod (klaster / on-prem overlay)
+
+Eesmärk: HA (`overlays/prod`, Ingress). Kui prod on **ainult AWS**, võib selle
+sammu asendada otse [4]-ga (ikka pärast stagingut).
+
+```bash
+kubectl apply -k k8s/overlays/prod
+kubectl -n ivxv-prod get pods,ingress
+```
+
+**Läbiminek:** change freeze / go-live checklist; rollback plaan (eelmine image
+tag).
+
+### 4. AWS (ECR → EKS → NLB)
+
+Eesmärk: sama image AWS-is; **RDS** (mitte in-cluster PG); avalik ainult
+**NLB → proxy**.
+
+| Samm | Tegevus | Overlay / tööriist |
+|------|---------|-------------------|
+| 4a | VPC + EKS + ECR (+ RDS) | `terraform/` (nt `envs/aws-dev`) |
+| 4b | `docker build` + push ECR (`ivxv/<teenus>:<TAG>`) | Samm 1 allpool |
+| 4c | Sea ECR image’id overlay’s | `kustomize edit set image` `overlays/aws` |
+| 4d | Secretid + `kubectl apply -k k8s/overlays/aws` | namespace `ivxv-aws` |
+| 4e | DNS → NLB; testi SNI läbi proxy | ainult proxy LoadBalancer |
+
+AWS-is **eraldi keskkondade** (test/dev/prod) soovitus:
+
+| AWS keskkond | Klaster / konto | Image tag | Märkus |
+|--------------|-----------------|-----------|--------|
+| aws-test / aws-dev | eraldi EKS (või vähemalt eraldi namespace + RDS) | git SHA või `dev` | `overlays/aws` koopia / patch |
+| aws-staging | eraldi | sama SHA mis läbis stagingu | |
+| aws-prod | eraldi konto soovituslik | sama SHA pärast staging go | RDS Multi-AZ jms |
+
+Ära kasuta `overlays/prod` Ingressit AWS-is — seal on `overlays/aws` (NLB,
+ilma Ingressita). Üks EKS klaster **keskkonna** kohta; ära sega
+dev/staging/prod pod’e samasse prod klastrisse ilma selge isoleeringuta.
+
+### Edutamise reegel (lühi)
+
+1. **Build** Dockerfile’dest → üks `TAG` (git SHA).
+2. **Test** lokaalselt / CI.
+3. **Dev** → **staging** → (prod overlay või) **AWS**.
+4. AWS-is: ECR push sama `TAG` → `apply -k overlays/aws` → NLB smoke.
+5. Prod’i mine ainult SHA-ga, mis on stagingus (või aws-stagingus) läbi saanud.
+
+---
+
 ## EKS klaster AWS-is — kirjeldus (1–4)
 
 Üks EKS klaster keskkonna kohta. Seal pod’id teenuste kaupa; andmed RDS-is;
