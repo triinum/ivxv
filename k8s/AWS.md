@@ -38,46 +38,30 @@ midagi peale proxy.
 
 ## Samm-sammuline plaan: test → dev → staging → prod → AWS
 
-Sama **Dockerfile** / image (git SHA tag) liigub edasi. Muutub overlay, DB ja
-proxy avalik uks. **Kõik ühes tabelis** (proxy + Kustomize + Ansible kaasas).
+Sama image (soovituslikult **git SHA** tag) liigub keskkonnast keskkonda.
+Muutub ainult **kus** see jookseb (overlay), **andmebaas** ja **kas proxy on
+avalik**. All on **ainult keskkonnad** — mis täpselt toimub ja mida teha.
 
-| Samm | Mis toimub | Kus (base / overlay / tööriist) | Proxy | Mida teha |
-|------|------------|----------------------------------|-------|-----------|
-| **0. Test** | Dockerfile’dest build + smoke; ECR-i ei laeta | `services/*/Dockerfile`; soovi korral kind | pod võib olla, **avalikku ust ei ole** | `docker build -f services/…/Dockerfile`; smoke; kind + `overlays/dev` |
-| **1. Dev** | Täis stack; in-cluster Postgres; 1 replica | **overlay** `k8s/overlays/dev` ← **base** `k8s/base/` (`kustomization.yaml`: `resources: ../../base` + `patches/` + `images: …:dev`) | **ClusterIP** (port-forward) | `kubectl apply -k k8s/overlays/dev`; Secret `ivxv-config` |
-| **2. Staging** | Sama SHA; rohkem replica’sid; regressioon | **overlay** `k8s/overlays/staging` (+ `ingress.yaml`) | **Ingress → proxy** (+ admin Ingress) | Sea tag `staging`; Ingress hostid; `kubectl apply -k …` |
-| **3. Prod** | HA on-prem / tavaline K8s. Kui prod = ainult AWS → samm 4 | **overlay** `k8s/overlays/prod` (+ `ingress.yaml`) | **Ingress → proxy** (+ admin) | `kubectl apply -k k8s/overlays/prod`; go-live |
-| **4a. AWS infra** | VPC, ECR, EKS, RDS | `terraform/` (nt `envs/aws-dev`) | — | `terraform apply` (**Ansible ei tee**) |
-| **4b. Build/push** | Tõmmised ECR-i (sama TAG) | repo juur → ECR; Ansible roll `ecr_push` | — | `docker build`/`push` **või** `ansible-playbook playbooks/build-push.yml -e @inventory/group_vars/aws_dev.yml` |
-| **4c. Image’id overlay’s** | Overlay viitab ECR aadressidele | `k8s/overlays/aws` `images:` (sama `kustomization.yaml`) | — | `kustomize edit set image` **või** Ansible `ecr_push` (`ecr_set_kustomize_images`) |
-| **4d. Apply** | Pod’id EKS-is; in-cluster PG kustutatud | **overlay** `k8s/overlays/aws` (`delete-incluster-postgres`, `patch-proxy-service`); Ansible `k8s_apply` | Service → **NLB** (alles apply järel) | Secret käsitsi; `kubectl apply -k k8s/overlays/aws` **või** `ansible-playbook playbooks/apply.yml` / `site.yml` |
-| **4e. DNS** | Internet → ainult proxy | NLB hostname | **NLB → proxy only** (admin privaatne) | DNS → NLB; SNI smoke (**Ansible ei tee**) |
-| **K. Teenuse base** | Ühe teenuse Deployment + Service | `k8s/base/<teenus>/` (`deployment.yaml`, `service.yaml`, teenuse `kustomization.yaml`) | proxy base = ClusterIP Service | Muuda ainult ühist käitumist; `kubectl apply -k k8s/base/proxy` (üksik) |
-| **K. Stack base** | Kogu collector stack | `k8s/base/kustomization.yaml` (`resources:` config, postgres, proxy, voting, …) | proxy kaasas | Ära juuruta base’i otse prod’i — kasuta overlay’d |
-| **K. Overlay** | Namespace, patches, image tag, Ingress/NLB | `k8s/overlays/<env>/kustomization.yaml` | vt read 1–4e | `kubectl apply -k k8s/overlays/<env>` |
-| **K. kustomization väljad** | Retsept: mida võtta / patchida / milline image | `namespace`, `resources`, `patches`, `images`, `labels` | aws: `patch-proxy-service` → LoadBalancer | Preview: `kubectl kustomize k8s/overlays/<env>` |
-| **A. Inventory** | Region, cluster, ECR, tag | `ansible/inventory/group_vars/` (`aws_dev.yml`, `aws_prod.yml`) | — | Täida `ecr_registry` Terraformist |
-| **A. site.yml** | Täis ops: build+push+apply | `ansible/playbooks/site.yml` + rollid `ecr_push`, `k8s_apply` | pärast apply: NLB→proxy | `ansible-playbook playbooks/site.yml -e @inventory/group_vars/aws_dev.yml` |
-| **A. Ei tee** | Secretid, DNS, Terraform | — | — | `ivxv-config`, Route 53, `terraform apply` jäävad käsitsi |
+| Keskkond | Mis toimub | Mida teha (täpsed sammud) |
+|----------|------------|---------------------------|
+| **Test** | Sa kontrollid, et iga online-teenuse `Dockerfile` **ehitsub** ja konteiner **käivitub**. ECR-i ega päris klastrit veel ei kasutata. Proxy’d (ega teisi teenuseid) internetti ei avata. Repos **ei ole** `overlays/test` — see etapp on build + smoke enne `dev` peale panekut. | 1. Repo **juurest**: `docker build -f services/<nimi>/Dockerfile -t ivxv/<nimi>:test .` (kõik online-teenused, sh `proxy`).<br>2. Smoke: `docker run --rm …` (või vähemalt et protsess ei kuku kohe); vajadusel mount `/etc/ivxv`.<br>3. Soovi korral kind/minikube: `kubectl apply -k k8s/overlays/dev` ja vaata pode.<br>4. **Ära** `docker push` ECR-i enne kui build/smoke on OK. |
+| **Dev** | Kustomize võtab ühise **base** (`k8s/base/` = kõik teenuste Deployment’id + Service’id + in-cluster Postgres + config Secret stub) ja rakendab **overlay** `k8s/overlays/dev`: namespace `ivxv-dev`, 1 replica, image tag `:dev`, kerged resource’id. **Proxy pod jookseb**, aga Service on **ClusterIP** — väljastpoolt klastrit otse ei pääse (kasuta `port-forward`). Andmed on **klastri-siseses Postgresis**, mitte RDS-is. | 1. Ehita/tagi image’d `:dev` (või osuta registrile overlay `images:` plokis).<br>2. Täida Secret `ivxv-config` (trust / election / technical; `storage.protocol: postgres`).<br>3. `kubectl apply -k k8s/overlays/dev`<br>4. `kubectl -n ivxv-dev get pods,svc`<br>5. Proxy test: `kubectl -n ivxv-dev port-forward svc/proxy 8443:443` ja SNI/smoke klastri kaudu.<br>6. Läbiminek: proxy + storage + vähemalt üks backend Ready; PutGetter töötab. |
+| **Staging** | **Sama commit/SHA** mis testis/dev’is läbi sai. Overlay `k8s/overlays/staging` võtab sama base’i, aga: namespace `ivxv-staging`, rohkem replica’sid, image `:staging`, plus **`ingress.yaml`**. Nüüd tuleb väline HTTPS liiklus **Ingress → proxy** (ja eraldi Ingress adminile). Postgres endiselt in-cluster. Eesmärk: prod-lähedane regressioon enne päris prod’i. | 1. Kasuta **sama SHA** image’t; sea overlay’s tag `staging` (`images:` või `kustomize edit set image`).<br>2. Muuda `k8s/overlays/staging/ingress.yaml` hostinimed päriseks.<br>3. Uuenda Secretid staging väärtustega.<br>4. `kubectl apply -k k8s/overlays/staging`<br>5. Testi TLS/SNI **läbi Ingressi** proxy’le (mitte ainult port-forward).<br>6. Läbiminek: smoke + regressioon OK. |
+| **Prod** (on-prem / tavaline K8s) | HA juurutus overlay’ga `k8s/overlays/prod`: namespace `ivxv-prod`, rohkem replica’sid, image `:prod`, **Ingress → proxy** (+ admin Ingress), in-cluster Postgres. See on **mitte-AWS** prod. Kui teie päris prod on **ainult AWS-is**, seda overlay’d ei kasuta — mine otse reale **AWS** (pärast stagingut). | 1. Ainult SHA-ga, mis stagingus läbi sai.<br>2. Seadista `overlays/prod/ingress.yaml` hostid.<br>3. `kubectl apply -k k8s/overlays/prod`<br>4. `kubectl -n ivxv-prod get pods,ingress`<br>5. Go-live checklist + rollback (eelmine image tag).<br>6. Kui prod = AWS → **ära** kasuta seda Ingress-overlay’d; kasuta rida **AWS**. |
+| **AWS** | Terraform loob infra (VPC, **ECR**, **EKS**, **RDS**). Ansible (või käsitsi) ehitab Dockerfile’dest tõmmised, laeb ECR-i, paneb `overlays/aws` `images:` ECR aadressidele, teeb `kubectl apply -k`. Overlay kustutab in-cluster Postgresi (`delete-incluster-postgres`) — andmed on **RDS**-is (`storage.protocol: postgres` + URI). Proxy Service muutub **LoadBalancer** + NLB annotatsioonid (`patch-proxy-service`): internet näeb **ainult NLB → proxy**; admin ja teised teenused jäävad privaatseks. Ingressit AWS-is ei kasutata. | 1. `cd terraform/envs/aws-dev` (või prod) → `terraform apply` (ECR+EKS+RDS).<br>2. Täida `ansible/inventory/group_vars/aws_dev.yml`: `ecr_registry`, `eks_cluster_name`, `image_tag` (= SHA).<br>3. **Kas** `cd ansible && ansible-playbook playbooks/site.yml -e @inventory/group_vars/aws_dev.yml` **või** käsitsi: ECR login → `docker build`/`push` → `kustomize edit set image` → Secret `ivxv-config` → `kubectl apply -k k8s/overlays/aws`.<br>4. `kubectl -n ivxv-aws get pods,svc` — proxy peab saama EXTERNAL-IP (NLB).<br>5. DNS → NLB hostname; SNI smoke läbi avaliku 443.<br>6. Ansible **ei** loo Secret’eid ega DNS-i ega Terraformi — need käsitsi. |
 
-**Lühireeglid**
+**Kuidas Kustomize siin töötab (lühi, sama igas keskkonnas peale Testi)**
 
-| Teema | Reegel |
-|-------|--------|
-| Proxy | Pod **igas** etapis; avalik uks alles staging/prod (Ingress) või AWS (NLB) — **mitte ainult prod** |
-| Base vs overlay | Base = ühine; overlay = keskkond (`dev`/`staging`/`prod`/`aws`) |
-| Ansible | Pärast Terraformi; `localhost`; asendab käsitsi 4b–4d |
-| test overlay | Repos **ei ole** `overlays/test` — test = build enne `dev` |
+| Osa | Tähendus | Tee |
+|-----|----------|-----|
+| Teenuse **base** | Ühe teenuse Deployment + Service | `k8s/base/<teenus>/` |
+| Stack **base** | Kogu stack kokku | `k8s/base/kustomization.yaml` |
+| **Overlay** | Base + namespace + patches + image tag (+ Ingress või NLB) | `k8s/overlays/<keskkond>/` |
+| Käsk | Rakenda keskkonna overlay | `kubectl apply -k k8s/overlays/<keskkond>` |
 
-### Overlay’d võrdluses (abi)
+**Proxy kiiresti:** pod on Dev/Staging/Prod/AWS sees alati; avalik uks on alles Staging/Prod (**Ingress**) või AWS (**NLB**). Testis/Dev’is avalikku ust ei avata.
 
-| Overlay | Namespace | Image | Postgres | Proxy avalik |
-|---------|-----------|-------|----------|--------------|
-| `dev` | `ivxv-dev` | `:dev` | in-cluster | ei (ClusterIP) |
-| `staging` | `ivxv-staging` | `:staging` | in-cluster | Ingress |
-| `prod` | `ivxv-prod` | `:prod` | in-cluster | Ingress |
-| `aws` | `ivxv-aws` | ECR `…/ivxv/<s>:<TAG>` | **RDS** | **NLB** |
-
+### 0. Test (kohalik / CI)
 ### 0. Test (kohalik / CI)
 
 Eesmärk: tõmmised ehituvad ja teenus käivitub vähemalt konteinerina.
