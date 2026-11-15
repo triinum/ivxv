@@ -6,11 +6,27 @@ Kustomize manifestid.
 
 ## Mida me teeme (lühidalt)
 
-1. **Ehitame** igast teenuse `Dockerfile`-ist Dockeri tõmmise ja **laeme** need
-   üles **Amazon ECR** konteinerite registrisse.
-2. **Loome** AWS-is **Amazon EKS** (Kubernetes) klastri ja **käivitame** kõik
-   teenused korraga olemasolevate `k8s/` seadistusfailide abil
-   (`kubectl apply`).
+IVXV kogumisteenus on juba disainitud **mikroteenustena**. Enne AWS samme on
+oluline, **millistel üksustel on Dockerfile** ja millistel mitte.
+
+### Dockerfile — mis tuleb / mis ei tule
+
+| | Üksused | Dockerfile? | Miks |
+|--|---------|-------------|------|
+| **Online mikroteenused** | `proxy`, `choices`, `voting`, `verification`, `storage`, `sessionstatus`, `mid`, `smartid`, `webeid`, `votesorder`, `xroad-service`, `collector-admin` | **Jah** — `services/<nimi>/Dockerfile` | Jooksevad pidevalt EKS-is pod'idena; ECR + Deployment |
+| **Offline tööriistad** | `key`, `processor`, `auditor` | **Jah** (image võib olla ECR-is) | Job / operaatori masin; **ei** ole püsivad EKS Deployment'id |
+| **Jagatud kood** | `common/`, `core/` | **Ei** | Teegid, mida Docker build sisse kopeerib; iseenesest ei juurutata |
+| **Build helper'id** | `docker/` (nt `go-build.sh`) | **Ei** (ei ole teenuse image) | Ainult ehituse abi; teenuse Dockerfile elab `services/` all |
+
+Kokkuvõte: **iga juurutatav teenus / offline app = oma kaust + oma Dockerfile**.
+Teegid ja helper'id Dockerfile'i ei saa, sest need pole eraldi konteinerteenused.
+
+### AWS sammud
+
+1. **Ehitame** online-teenuste (ja vajadusel offline) `Dockerfile`-idest
+   tõmmised ja **laeme** need **Amazon ECR**-i.
+2. **Loome** AWS-is **Amazon EKS** klastri ja **käivitame** online-teenused
+   `k8s/` manifestidega (`kubectl apply -k k8s/overlays/aws`).
 3. **Suuname** avaliku liikluse läbi koormusjaoturi **ainult proxy teenusele**,
    jättes ülejäänud mikroteenused omavaheliseks suhtluseks **privaatvõrku**.
 
