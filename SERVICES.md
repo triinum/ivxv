@@ -49,7 +49,7 @@ make docker
 | **choices** | `services/choices/` | Voter/choices/district lists |
 | **voting** | `services/voting/` | Vote acceptance and qualification |
 | **verification** | `services/verification/` | Vote verification |
-| **storage** | `services/storage/` | Election data storage (etcd) |
+| **storage** | `services/storage/` | Election data storage (`postgres` PutGetter; etcd legacy) |
 | **sessionstatus** | `services/sessionstatus/` | Session status tracking |
 | **mid** | `services/mid/` | Mobile-ID helper |
 | **smartid** | `services/smartid/` | Smart-ID helper |

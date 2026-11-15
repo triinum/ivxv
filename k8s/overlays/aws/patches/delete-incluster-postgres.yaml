@@ -1,0 +1,13 @@
+# Prefer Amazon RDS (or other managed Postgres). Do not run Postgres in-cluster
+# on the AWS overlay. Configure technical.storage.protocol=postgres with an RDS URI.
+$patch: delete
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: postgres
+---
+$patch: delete
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgres

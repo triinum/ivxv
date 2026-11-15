@@ -1,5 +1,9 @@
 /*
-The storage service controls a locally running etcd instance.
+The storage service historically controlled a locally running etcd instance.
+
+When technical.storage.protocol is "postgres", etcd is not started: the process
+only verifies connectivity to PostgreSQL (e.g. Amazon RDS) and then waits. All
+collector services talk to Postgres through the PutGetter client directly.
 */
 package main
 
@@ -30,6 +34,7 @@ import (
 	"ivxv.ee/common/collector/storage/etcd"
 	"ivxv.ee/common/collector/yaml"
 	//ivxv:modules common/collector/container
+	//ivxv:modules common/collector/storage
 )
 
 const zero = 0
@@ -460,32 +465,43 @@ func storagemain() (code int) {
 	var err error
 	if c.Conf.Technical != nil {
 		prot := c.Conf.Technical.Storage.Protocol
-		if prot != storage.Etcd {
+		switch prot {
+		case storage.Etcd:
+			var cmd *ctrl
+			if cmd, code, err = newCtrl(c.Conf.Technical, c.Service,
+				c.Conf.Election.Identifier); err != nil {
+
+				return c.Error(code, EtcdControllerError{Err: err,
+					Description: _STORAGE_CTRL_CFG},
+					"failed to configure etcd options:", err)
+			}
+
+			if s, err = server.NewController(&c.Conf.Version,
+				cmd.start, cmd.check, cmd.stop); err != nil {
+
+				return c.Error(exit.Config, ControllerConfError{Err: err,
+					Description: _STORAGE_CTRL},
+					"failed to configure controller:", err)
+			}
+		case storage.Postgres:
+			var pg *postgresCtrl
+			if pg, code, err = newPostgresCtrl(c.Conf.Technical, c.Service); err != nil {
+				return c.Error(code, err, "failed to configure postgres storage:", err)
+			}
+			if s, err = server.NewController(&c.Conf.Version,
+				pg.start, pg.check, pg.stop); err != nil {
+				return c.Error(exit.Config, ControllerConfError{Err: err,
+					Description: _STORAGE_CTRL},
+					"failed to configure postgres controller:", err)
+			}
+		default:
 			return c.Error(exit.Config, StorageProtocolError{Protocol: prot,
 				Description: _STORAGE_PROTOCOL},
-				"etcd storage protocol must be used for the",
-				"storage service, but protocol is", prot)
-		}
-
-		var cmd *ctrl
-		if cmd, code, err = newCtrl(c.Conf.Technical, c.Service,
-			c.Conf.Election.Identifier); err != nil {
-
-			return c.Error(code, EtcdControllerError{Err: err,
-				Description: _STORAGE_CTRL_CFG},
-				"failed to configure etcd options:", err)
-		}
-
-		if s, err = server.NewController(&c.Conf.Version,
-			cmd.start, cmd.check, cmd.stop); err != nil {
-
-			return c.Error(exit.Config, ControllerConfError{Err: err,
-				Description: _STORAGE_CTRL},
-				"failed to configure controller:", err)
+				"storage service supports etcd or postgres, but protocol is", prot)
 		}
 	}
 
-	// Control etcd during the voting period.
+	// Control storage backend during the voting period.
 	if c.Until >= command.Execute {
 		if err = s.Control(c.Ctx); err != nil {
 			return c.Error(exit.Unavailable, ControlError{Err: err,

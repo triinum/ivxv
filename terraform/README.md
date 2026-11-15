@@ -7,13 +7,17 @@ Teenuste pod’id jäävad `k8s/` (Kustomize) kätte; tõmmiste build/push ja
 ```text
 terraform/
   modules/
-    network/     # VPC + subnetid (skelett)
-    ecr/         # ivxv/<teenus> repositooriumid
-    eks/         # EKS klaster + sõlmede IAM (skelett)
+    network/       # VPC + subnetid (skelett)
+    ecr/           # ivxv/<teenus> repositooriumid
+    eks/           # EKS klaster + sõlmede IAM (skelett)
+    rds-postgres/  # managed Postgres PutGetter backend (etcd asendus)
   envs/
     aws-dev/
     aws-prod/
 ```
+
+Storage: kasuta technical configis `protocol: postgres` + RDS URI
+(vt `common/collector/storage/postgres`). etcd jääb valikuliseks pärandiks.
 
 Voog koos Ansible’iga: vt ka `k8s/AWS.md` ja `ansible/README.md`.
 
